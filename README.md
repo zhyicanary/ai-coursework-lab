@@ -1,4 +1,4 @@
-# 智能应用系统设计 — 课程设计作品集
+# 智能应用系统设计 — 课程设计作品集 | [English](README_EN.md)
 
 [![Python](https://img.shields.io/badge/Python-3.14-blue)](https://www.python.org/)
 [![LangGraph](https://img.shields.io/badge/LangGraph-1.2-orange)](https://www.langchain.com/langgraph)

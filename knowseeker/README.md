@@ -1,4 +1,4 @@
-# KnowSeeker — 基于 MCP 的 Agentic RAG 知识助手
+# KnowSeeker — 基于 MCP 的 Agentic RAG 知识助手 | [English](README_EN.md)
 
 > 范式一：单 Agent 深度推理 | [返回合集首页](../README.md)
 

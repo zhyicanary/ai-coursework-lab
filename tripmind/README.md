@@ -1,4 +1,4 @@
-# TripMind — 基于多智能体协同的旅游规划系统
+# TripMind — 基于多智能体协同的旅游规划系统 | [English](README_EN.md)
 
 > 范式二：多 Agent 协同编排 | [返回合集首页](../README.md)
 
