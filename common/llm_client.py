@@ -4,32 +4,77 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-LLM_BACKEND = os.getenv("LLM_BACKEND", "ollama")
 
-if LLM_BACKEND == "ollama":
-    client = AsyncOpenAI(
-        base_url=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1"),
-        api_key="ollama",
-    )
-    DEFAULT_MODEL = os.getenv("OLLAMA_MODEL", "qwen3.5:4b")
-else:
-    client = AsyncOpenAI(
-        api_key=os.getenv("DEEPSEEK_API_KEY"),
-        base_url=os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
-    )
-    DEFAULT_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
+class LLMClient:
+    """可热切换的 LLM 客户端，支持运行时修改配置。"""
+
+    def __init__(self):
+        self.backend: str = os.getenv("LLM_BACKEND", "deepseek")
+        self.model: str = ""
+        self.api_key: str = ""
+        self.base_url: str = ""
+        self.client: AsyncOpenAI | None = None
+        self._refresh()
+
+    def _refresh(self):
+        """根据当前属性重新创建 client。"""
+        if self.backend == "ollama":
+            self.base_url = self.base_url or os.getenv(
+                "OLLAMA_BASE_URL", "http://localhost:11434/v1"
+            )
+            self.api_key = "ollama"
+            self.model = self.model or os.getenv("OLLAMA_MODEL", "qwen3.5:4b")
+        else:
+            self.base_url = self.base_url or os.getenv(
+                "DEEPSEEK_BASE_URL", "https://api.deepseek.com"
+            )
+            self.api_key = self.api_key or os.getenv("DEEPSEEK_API_KEY", "")
+            self.model = self.model or os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
+
+        self.client = AsyncOpenAI(api_key=self.api_key, base_url=self.base_url)
+
+    def update(
+        self,
+        backend: str | None = None,
+        model: str | None = None,
+        api_key: str | None = None,
+        base_url: str | None = None,
+    ):
+        """更新配置并重建 client，用于 Gradio 设置界面。"""
+        if backend is not None:
+            self.backend = backend
+        if model is not None:
+            self.model = model
+        if api_key is not None:
+            self.api_key = api_key
+        if base_url is not None:
+            self.base_url = base_url
+        self._refresh()
+
+    def get_config(self) -> dict:
+        """返回当前配置，供 UI 回显。"""
+        return {
+            "backend": self.backend,
+            "model": self.model,
+            "api_key": self.api_key,
+            "base_url": self.base_url,
+        }
+
+    async def chat_completion(
+        self,
+        messages: list[dict],
+        model: str | None = None,
+        temperature: float = 0.7,
+        max_tokens: int = 2000,
+    ) -> str:
+        response = await self.client.chat.completions.create(
+            model=model or self.model,
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
+        return response.choices[0].message.content
 
 
-async def chat_completion(
-    messages: list[dict],
-    model: str = DEFAULT_MODEL,
-    temperature: float = 0.7,
-    max_tokens: int = 2000,
-) -> str:
-    response = await client.chat.completions.create(
-        model=model,
-        messages=messages,
-        temperature=temperature,
-        max_tokens=max_tokens,
-    )
-    return response.choices[0].message.content
+# 全局单例，所有模块 import llm 即可使用
+llm = LLMClient()
