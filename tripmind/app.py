@@ -9,13 +9,40 @@ from common.llm_client import llm
 
 
 def update_settings(backend, model, api_key, base_url):
+    if backend == "deepseek" and not api_key:
+        gr.Warning("DeepSeek 后端必须填写 API Key")
+        return "请填写 API Key"
     llm.update(backend=backend, model=model, api_key=api_key, base_url=base_url)
     return f"已切换到 {backend} / {model}"
 
 
+def on_backend_change(backend):
+    """根据后端选择更新默认值并控制 API Key 显示。"""
+    if backend == "ollama":
+        return (
+            gr.update(value="qwen3.5:4b", visible=True),  # model
+            gr.update(value="", visible=False),  # api_key 隐藏
+            gr.update(value="http://localhost:11434/v1", visible=True),  # base_url
+        )
+    else:
+        return (
+            gr.update(value="deepseek-chat", visible=True),  # model
+            gr.update(value="", visible=True),  # api_key 显示
+            gr.update(value="https://api.deepseek.com", visible=True),  # base_url
+        )
+
+
 def get_config():
     cfg = llm.get_config()
-    return cfg["backend"], cfg["model"], cfg["api_key"], cfg["base_url"]
+    is_ollama = cfg["backend"] == "ollama"
+    status_msg = f"当前: {cfg['backend']} / {cfg['model']}"
+    return (
+        cfg["backend"],
+        cfg["model"],
+        gr.update(value=cfg["api_key"], visible=not is_ollama),
+        cfg["base_url"],
+        status_msg,
+    )
 
 
 async def chat(message, history):
@@ -45,7 +72,7 @@ with gr.Blocks(title="TripMind - 多Agent旅行规划") as app:
                 )
             with gr.Row():
                 model = gr.Textbox(label="模型", value="deepseek-chat")
-                api_key = gr.Textbox(label="API Key", type="password", value="")
+                api_key = gr.Textbox(label="API Key", type="password", value="", visible=True)
             with gr.Row():
                 base_url = gr.Textbox(
                     label="Base URL", value="https://api.deepseek.com"
@@ -58,8 +85,15 @@ with gr.Blocks(title="TripMind - 多Agent旅行规划") as app:
                 status,
             )
 
+            # 后端切换时更新默认值并控制 API Key 显示
+            backend.change(
+                on_backend_change,
+                [backend],
+                [model, api_key, base_url],
+            )
+
             # 页面加载时回显当前配置
-            app.load(get_config, None, [backend, model, api_key, base_url])
+            app.load(get_config, None, [backend, model, api_key, base_url, status])
 
 
 if __name__ == "__main__":

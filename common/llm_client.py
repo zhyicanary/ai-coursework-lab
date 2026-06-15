@@ -1,8 +1,12 @@
 import os
+from pathlib import Path
 from openai import AsyncOpenAI
-from dotenv import load_dotenv
+from dotenv import load_dotenv, set_key
 
-load_dotenv()
+# 项目根目录的 .env 文件路径
+ENV_FILE = Path(__file__).parent.parent / ".env"
+
+load_dotenv(override=True)
 
 
 class LLMClient:
@@ -17,7 +21,9 @@ class LLMClient:
         self._refresh()
 
     def _refresh(self):
-        """根据当前属性重新创建 client。"""
+        """根据当前属性重新创建 client，并从 .env 读取最新配置。"""
+        load_dotenv(override=True)
+        
         if self.backend == "ollama":
             self.base_url = self.base_url or os.getenv(
                 "OLLAMA_BASE_URL", "http://localhost:11434/v1"
@@ -31,6 +37,9 @@ class LLMClient:
             self.api_key = self.api_key or os.getenv("DEEPSEEK_API_KEY", "")
             self.model = self.model or os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
 
+        if not self.api_key:
+            self.api_key = "sk-placeholder"
+            
         self.client = AsyncOpenAI(api_key=self.api_key, base_url=self.base_url)
 
     def update(
@@ -40,15 +49,26 @@ class LLMClient:
         api_key: str | None = None,
         base_url: str | None = None,
     ):
-        """更新配置并重建 client，用于 Gradio 设置界面。"""
+        """更新配置并重建 client，同时持久化到 .env 文件。"""
         if backend is not None:
             self.backend = backend
+            set_key(str(ENV_FILE), "LLM_BACKEND", backend)
         if model is not None:
             self.model = model
-        if api_key is not None:
+            if backend == "ollama" or self.backend == "ollama":
+                set_key(str(ENV_FILE), "OLLAMA_MODEL", model)
+            else:
+                set_key(str(ENV_FILE), "DEEPSEEK_MODEL", model)
+        if api_key is not None and api_key != "":
             self.api_key = api_key
+            if self.backend != "ollama":
+                set_key(str(ENV_FILE), "DEEPSEEK_API_KEY", api_key)
         if base_url is not None:
             self.base_url = base_url
+            if backend == "ollama" or self.backend == "ollama":
+                set_key(str(ENV_FILE), "OLLAMA_BASE_URL", base_url)
+            else:
+                set_key(str(ENV_FILE), "DEEPSEEK_BASE_URL", base_url)
         self._refresh()
 
     def get_config(self) -> dict:
