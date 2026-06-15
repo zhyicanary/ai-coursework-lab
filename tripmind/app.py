@@ -1,3 +1,9 @@
+import sys
+from pathlib import Path
+
+# 将项目根目录添加到 Python 路径
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
 import gradio as gr
 from common.llm_client import llm
 
@@ -20,12 +26,12 @@ async def chat(message, history):
     return await llm.chat_completion(messages)
 
 
-with gr.Blocks(title="TripMind - 多Agent旅行规划", theme=gr.themes.Soft()) as app:
+with gr.Blocks(title="TripMind - 多Agent旅行规划") as app:
     gr.Markdown("# TripMind - 多Agent协同旅行规划")
 
     with gr.Tabs():
         with gr.Tab("对话"):
-            chatbot = gr.Chatbot(type="messages")
+            chatbot = gr.Chatbot()
             msg = gr.Textbox(placeholder="输入你的旅行需求...", label="消息")
             msg.submit(chat, [msg, chatbot], [chatbot]).then(
                 lambda: "", None, msg
@@ -57,4 +63,4 @@ with gr.Blocks(title="TripMind - 多Agent旅行规划", theme=gr.themes.Soft()) 
 
 
 if __name__ == "__main__":
-    app.launch(server_name="0.0.0.0", server_port=7861)
+    app.launch(server_name="0.0.0.0", server_port=7861, theme=gr.themes.Soft())
