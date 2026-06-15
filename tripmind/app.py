@@ -16,17 +16,21 @@ def update_settings(backend, model, api_key, base_url):
     return f"已切换到 {backend} / {model}"
 
 
+DEEPSEEK_MODELS = ["deepseek-chat", "deepseek-reasoner", "deepseek-coder"]
+OLLAMA_MODELS = ["qwen3.5:4b", "llama3.2", "gemma2"]
+
+
 def on_backend_change(backend):
     """根据后端选择更新默认值并控制 API Key 显示。"""
     if backend == "ollama":
         return (
-            gr.update(value="qwen3.5:4b", visible=True),  # model
+            gr.update(value="qwen3.5:4b", choices=OLLAMA_MODELS),  # model
             gr.update(value="", visible=False),  # api_key 隐藏
             gr.update(value="http://localhost:11434/v1", visible=True),  # base_url
         )
     else:
         return (
-            gr.update(value="deepseek-chat", visible=True),  # model
+            gr.update(value="deepseek-chat", choices=DEEPSEEK_MODELS),  # model
             gr.update(value="", visible=True),  # api_key 显示
             gr.update(value="https://api.deepseek.com", visible=True),  # base_url
         )
@@ -35,10 +39,11 @@ def on_backend_change(backend):
 def get_config():
     cfg = llm.get_config()
     is_ollama = cfg["backend"] == "ollama"
+    model_choices = OLLAMA_MODELS if is_ollama else DEEPSEEK_MODELS
     status_msg = f"当前: {cfg['backend']} / {cfg['model']}"
     return (
         cfg["backend"],
-        cfg["model"],
+        gr.update(value=cfg["model"], choices=model_choices),
         gr.update(value=cfg["api_key"], visible=not is_ollama),
         cfg["base_url"],
         status_msg,
@@ -71,7 +76,7 @@ with gr.Blocks(title="TripMind - 多Agent旅行规划") as app:
                     ["deepseek", "ollama"], label="后端", value="deepseek"
                 )
             with gr.Row():
-                model = gr.Textbox(label="模型", value="deepseek-chat")
+                model = gr.Dropdown(label="模型", value="deepseek-chat", choices=DEEPSEEK_MODELS)
                 api_key = gr.Textbox(label="API Key", type="password", value="", visible=True)
             with gr.Row():
                 base_url = gr.Textbox(
