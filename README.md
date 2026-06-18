@@ -28,7 +28,7 @@
 
 ```bash
 git clone <this-repo>
-cd ai-coursework-lab·
+cd ai-coursework-lab
 
 # 安装依赖
 uv sync
@@ -40,8 +40,12 @@ cp .env.example .env
 # 启动项目一：知识助手
 uv run streamlit run knowseeker/app.py
 
-# 启动项目二：旅游助手
-uv run python tripmind/app.py
+# 启动项目二：旅游助手（支持热加载）
+uv run python -m gradio tripmind/app.py --watch-dirs .
+
+# 或使用 Makefile（更简洁）
+make knowseeker
+make tripmind
 ```
 
 ---
@@ -73,7 +77,7 @@ uv run streamlit run knowseeker/app.py
 **课程关键词覆盖：** 大模型 · AI Agent · LangChain · LangGraph · MCP · RAG · 多智能体协同
 
 ```bash
-uv run python tripmind/app.py
+uv run python -m gradio tripmind/app.py --watch-dirs .
 ```
 
 ---
@@ -119,6 +123,7 @@ ai-coursework-lab/
 │   ├── 02-knowseeker.md
 │   └── 03-tripmind.md
 ├── .env.example
+├── Makefile                   # 快捷启动命令
 ├── pyproject.toml
 └── README.md                  # 本文件
 ```
