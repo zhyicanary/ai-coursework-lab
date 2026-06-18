@@ -1,5 +1,7 @@
 import sys
+import subprocess
 from pathlib import Path
+from functools import lru_cache
 
 # 将项目根目录添加到 Python 路径
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -16,34 +18,77 @@ def update_settings(backend, model, api_key, base_url):
     return f"已切换到 {backend} / {model}"
 
 
-DEEPSEEK_MODELS = ["deepseek-chat", "deepseek-reasoner", "deepseek-coder"]
-OLLAMA_MODELS = ["qwen3.5:4b", "llama3.2", "gemma2"]
+@lru_cache(maxsize=1)
+def fetch_deepseek_models():
+    """从 DeepSeek 官网获取模型列表，失败时返回默认列表"""
+    try:
+        import httpx
+        from dotenv import load_dotenv
+        import os
+        
+        load_dotenv()
+        api_key = os.getenv("DEEPSEEK_API_KEY", "")
+        
+        if api_key:
+            headers = {"Authorization": f"Bearer {api_key}"}
+            resp = httpx.get("https://api.deepseek.com/models", headers=headers, timeout=5)
+            if resp.status_code == 200:
+                models = [m["id"] for m in resp.json().get("data", [])]
+                if models:
+                    return models
+        
+        return ["deepseek-chat", "deepseek-reasoner", "deepseek-coder"]
+    except Exception:
+        return ["deepseek-chat", "deepseek-reasoner", "deepseek-coder"]
+
+
+def fetch_ollama_models():
+    """从本地 Ollama 获取模型列表"""
+    try:
+        result = subprocess.run(["ollama", "list"], capture_output=True, text=True, timeout=5)
+        if result.returncode == 0:
+            models = []
+            for line in result.stdout.strip().split("\n")[1:]:
+                name = line.split()[0] if line.strip() else None
+                if name:
+                    models.append(name)
+            return models if models else ["qwen3.5:4b"]
+        return ["qwen3.5:4b"]
+    except Exception:
+        return ["qwen3.5:4b"]
 
 
 def on_backend_change(backend):
     """根据后端选择更新默认值并控制 API Key 显示。"""
     if backend == "ollama":
+        models = fetch_ollama_models()
+        default_model = models[0] if models else "qwen3.5:4b"
         return (
-            gr.update(value="qwen3.5:4b", choices=OLLAMA_MODELS),  # model
-            gr.update(value="", visible=False),  # api_key 隐藏
-            gr.update(value="http://localhost:11434/v1", visible=True),  # base_url
+            gr.update(value=default_model, choices=models),
+            gr.update(value="", visible=False),
+            gr.update(value="http://localhost:11434/v1", visible=True),
         )
     else:
+        models = fetch_deepseek_models()
+        default_model = models[0] if models else "deepseek-chat"
         return (
-            gr.update(value="deepseek-chat", choices=DEEPSEEK_MODELS),  # model
-            gr.update(value="", visible=True),  # api_key 显示
-            gr.update(value="https://api.deepseek.com", visible=True),  # base_url
+            gr.update(value=default_model, choices=models),
+            gr.update(value="", visible=True),
+            gr.update(value="https://api.deepseek.com", visible=True),
         )
 
 
 def get_config():
     cfg = llm.get_config()
     is_ollama = cfg["backend"] == "ollama"
-    model_choices = OLLAMA_MODELS if is_ollama else DEEPSEEK_MODELS
+    if is_ollama:
+        models = fetch_ollama_models()
+    else:
+        models = fetch_deepseek_models()
     status_msg = f"当前: {cfg['backend']} / {cfg['model']}"
     return (
         cfg["backend"],
-        gr.update(value=cfg["model"], choices=model_choices),
+        gr.update(value=cfg["model"], choices=models),
         gr.update(value=cfg["api_key"], visible=not is_ollama),
         cfg["base_url"],
         status_msg,
@@ -76,7 +121,7 @@ with gr.Blocks(title="TripMind - 多Agent旅行规划") as app:
                     ["deepseek", "ollama"], label="后端", value="deepseek"
                 )
             with gr.Row():
-                model = gr.Dropdown(label="模型", value="deepseek-chat", choices=DEEPSEEK_MODELS)
+                model = gr.Dropdown(label="模型", value="deepseek-chat", choices=[])
                 api_key = gr.Textbox(label="API Key", type="password", value="", visible=True)
             with gr.Row():
                 base_url = gr.Textbox(
