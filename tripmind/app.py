@@ -58,21 +58,34 @@ def fetch_ollama_models():
         return ["qwen3.5:4b"]
 
 
+def _ensure_model_in_list(models: list[str], saved_model: str) -> list[str]:
+    """确保保存的模型在列表中，且排在第一位"""
+    if saved_model and saved_model not in models:
+        models.insert(0, saved_model)
+    elif saved_model and models and models[0] != saved_model:
+        models.remove(saved_model)
+        models.insert(0, saved_model)
+    return models
+
+
 def on_backend_change(backend):
-    """根据后端选择更新默认值并控制 API Key 显示。"""
+    """根据后端选择更新模型列表和 API Key 显示，使用该后端已保存的模型。"""
+    cfg = llm.get_config()
     if backend == "ollama":
         models = fetch_ollama_models()
-        default_model = models[0] if models else "qwen3.5:4b"
+        saved = cfg["model"] if cfg["backend"] == "ollama" else None
+        models = _ensure_model_in_list(models, saved)
         return (
-            gr.update(value=default_model, choices=models),
+            gr.update(value=models[0], choices=models),
             gr.update(value="", visible=False),
             gr.update(value="http://localhost:11434/v1", visible=True),
         )
     else:
         models = fetch_deepseek_models()
-        default_model = models[0] if models else "deepseek-chat"
+        saved = cfg["model"] if cfg["backend"] == "deepseek" else None
+        models = _ensure_model_in_list(models, saved)
         return (
-            gr.update(value=default_model, choices=models),
+            gr.update(value=models[0], choices=models),
             gr.update(value="", visible=True),
             gr.update(value="https://api.deepseek.com", visible=True),
         )
@@ -85,6 +98,7 @@ def get_config():
         models = fetch_ollama_models()
     else:
         models = fetch_deepseek_models()
+    models = _ensure_model_in_list(models, cfg["model"])
     status_msg = f"当前: {cfg['backend']} / {cfg['model']}"
     return (
         cfg["backend"],
@@ -121,7 +135,7 @@ with gr.Blocks(title="TripMind - 多Agent旅行规划") as app:
                     ["deepseek", "ollama"], label="后端", value="deepseek"
                 )
             with gr.Row():
-                model = gr.Dropdown(label="模型", value="deepseek-chat", choices=[])
+                model = gr.Dropdown(label="模型", value="deepseek-chat", choices=[], allow_custom_value=True)
                 api_key = gr.Textbox(label="API Key", type="password", value="", visible=True)
             with gr.Row():
                 base_url = gr.Textbox(
