@@ -25,3 +25,6 @@ data/
 
 # Claude Code
 .claude/
+
+# Other
+self-check-log.md
