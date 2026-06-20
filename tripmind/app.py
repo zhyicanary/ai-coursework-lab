@@ -1,8 +1,12 @@
 import sys
 import subprocess
 import asyncio
+import warnings
 from pathlib import Path
 from functools import lru_cache
+
+# 过滤 Gradio 依赖中的 Starlette 弃用警告（Gradio 尚未适配 Starlette 新常量名）
+warnings.filterwarnings("ignore", message=".*HTTP_422_UNPROCESSABLE_ENTITY.*")
 
 # 将项目根目录添加到 Python 路径
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -71,49 +75,59 @@ def _ensure_model_in_list(models: list[str], saved_model: str) -> list[str]:
 
 
 def on_backend_change(backend):
-    """根据后端选择更新模型列表和 API Key 显示，使用该后端已保存的模型。"""
+    """后端切换：瞬间返回默认值（不联网拉模型，避免 UI 卡 loading）。"""
     cfg = llm.get_config()
     if backend == "ollama":
-        models = fetch_ollama_models()
         saved = cfg["model"] if cfg["backend"] == "ollama" else None
-        models = _ensure_model_in_list(models, saved)
+        default_model = saved or "qwen3.5:4b"
         return (
-            gr.update(value=models[0], choices=models),
+            gr.update(value=default_model, choices=[default_model], allow_custom_value=True),
             gr.update(value="", visible=False),
             gr.update(value="http://localhost:11434/v1", visible=True),
         )
     else:
-        models = fetch_deepseek_models()
         saved = cfg["model"] if cfg["backend"] == "deepseek" else None
-        models = _ensure_model_in_list(models, saved)
+        default_model = saved or "deepseek-chat"
         return (
-            gr.update(value=models[0], choices=models),
+            gr.update(value=default_model, choices=[default_model], allow_custom_value=True),
             gr.update(value="", visible=True),
             gr.update(value="https://api.deepseek.com", visible=True),
         )
 
 
-def get_config():
+def refresh_model_list(backend):
+    """后台异步拉取模型列表并更新下拉框（被 .then() 触发，不阻塞 UI）。"""
     cfg = llm.get_config()
-    is_ollama = cfg["backend"] == "ollama"
-    if is_ollama:
+    if backend == "ollama":
         models = fetch_ollama_models()
+        saved = cfg["model"] if cfg["backend"] == "ollama" else None
     else:
         models = fetch_deepseek_models()
-    models = _ensure_model_in_list(models, cfg["model"])
-    status_msg = f"当前: {cfg['backend']} / {cfg['model']}"
+        saved = cfg["model"] if cfg["backend"] == "deepseek" else None
+    models = _ensure_model_in_list(models, saved)
+    return gr.update(choices=models)
+
+
+def get_config():
+    """页面加载时回显当前配置（快速返回，不触发网络请求）。"""
+    cfg = llm.get_config()
+    is_ollama = cfg["backend"] == "ollama"
+    # 只显示已保存的模型，不联网拉取
+    saved_model = cfg["model"]
+    choices = [saved_model] if saved_model else (["deepseek-chat"] if not is_ollama else ["qwen3.5:4b"])
     return (
         cfg["backend"],
-        gr.update(value=cfg["model"], choices=models),
+        gr.update(value=saved_model, choices=choices, allow_custom_value=True),
         gr.update(value=cfg["api_key"], visible=not is_ollama),
         cfg["base_url"],
-        status_msg,
+        f"当前: {cfg['backend']} / {cfg['model']}",
     )
 
 
 async def plan_travel(destination, days, budget, departure, preferences):
     """运行多 Agent 旅游规划"""
     if not destination or not days or not budget or not departure:
+        gr.Warning("请填写所有必填字段")
         return "请填写所有必填字段", "", "", None
     
     request = TravelRequest(
@@ -166,11 +180,18 @@ async def handle_adjustment(instruction, previous_state):
 
 
 async def chat(message, history):
+    """对话 Tab：消息历史格式 [{role, content}]"""
     messages = [{"role": "system", "content": "你是一个旅行规划助手。"}]
     for h in history:
         messages.append({"role": h["role"], "content": h["content"]})
     messages.append({"role": "user", "content": message})
-    return await llm.chat_completion(messages)
+
+    reply = await llm.chat_completion(messages)
+
+    # 返回完整历史（Gradio Chatbot 要求 list[dict] 格式）
+    history.append({"role": "user", "content": message})
+    history.append({"role": "assistant", "content": reply})
+    return history
 
 
 with gr.Blocks(title="TripMind - 多Agent旅行规划") as app:
@@ -256,15 +277,25 @@ with gr.Blocks(title="TripMind - 多Agent旅行规划") as app:
                 status,
             )
 
-            # 后端切换时更新默认值并控制 API Key 显示
+            # 后端切换：瞬间返回默认值（无 loading），再后台拉模型列表
             backend.change(
                 on_backend_change,
                 [backend],
                 [model, api_key, base_url],
+            ).then(
+                refresh_model_list,
+                [backend],
+                [model],
             )
 
-            # 页面加载时回显当前配置
-            app.load(get_config, None, [backend, model, api_key, base_url, status])
+            # 页面加载时回显当前配置，然后后台拉取模型列表
+            app.load(
+                get_config, None, [backend, model, api_key, base_url, status]
+            ).then(
+                refresh_model_list,
+                [backend],
+                [model],
+            )
 
 
 # ─── MCP Server 生命周期管理 ──────────────────────────────
