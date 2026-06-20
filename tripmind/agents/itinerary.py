@@ -1,69 +1,140 @@
-"""行程 Agent - 规划每日行程"""
+"""行程 Agent — 规划每日行程，依赖天气和交通信息。"""
+
+from tripmind.agents.base import BaseAgent
+from tripmind.prompts import ITINERARY_SYSTEM_PROMPT
 
 
-async def itinerary_agent(
-    city: str,
-    days: int,
-    weather: dict | None,
-    transport: dict | None
-) -> dict:
-    """
-    规划每日行程
-    依赖天气和交通信息
-    """
-    attractions = {
-        "成都": [
-            {"name": "宽窄巷子", "category": "历史街区", "ticket_price": 0, "duration": "2小时"},
-            {"name": "锦里", "category": "商业街", "ticket_price": 0, "duration": "2小时"},
-            {"name": "都江堰", "category": "历史遗迹", "ticket_price": 80, "duration": "3小时"},
-            {"name": "青城山", "category": "自然风光", "ticket_price": 80, "duration": "4小时"},
-            {"name": "成都博物馆", "category": "博物馆", "ticket_price": 0, "duration": "2小时"},
-        ],
-        "北京": [
-            {"name": "故宫", "category": "历史遗迹", "ticket_price": 60, "duration": "3小时"},
-            {"name": "长城", "category": "历史遗迹", "ticket_price": 40, "duration": "5小时"},
-            {"name": "颐和园", "category": "皇家园林", "ticket_price": 30, "duration": "3小时"},
-            {"name": "天坛", "category": "历史遗迹", "ticket_price": 15, "duration": "2小时"},
-        ],
-    }
-    
-    city_attractions = attractions.get(city, [
-        {"name": "市中心景点", "category": "综合", "ticket_price": 0, "duration": "2小时"},
-        {"name": "博物馆", "category": "博物馆", "ticket_price": 0, "duration": "2小时"},
-    ])
-    
-    daily_plans = []
-    arrival_time = "上午" if not transport else "根据交通时间"
-    
-    for day in range(1, days + 1):
-        weather_info = weather["daily"][day - 1] if weather and day <= len(weather.get("daily", [])) else {"condition": "晴"}
-        
-        if "雨" in weather_info.get("condition", ""):
-            indoor = [a for a in city_attractions if a["category"] in ["博物馆", "室内"]]
-            selected = indoor[:2] if indoor else city_attractions[:2]
-        else:
-            selected = city_attractions[((day - 1) * 2) % len(city_attractions):(day * 2) % len(city_attractions) + 2]
-            if not selected:
-                selected = city_attractions[:2]
-        
-        daily_plans.append({
-            "day": day,
-            "date": f"第{day}天",
-            "weather": weather_info.get("condition", "晴"),
-            "morning": f"抵达{city}" if day == 1 else f"上午：{selected[0]['name'] if selected else '自由活动'}",
-            "afternoon": f"下午：{selected[1]['name'] if len(selected) > 1 else '市区游览'}",
-            "evening": "晚上：品尝当地美食",
-            "attractions": selected,
-            "ticket_cost": sum(a["ticket_price"] for a in selected)
+class ItineraryAgent(BaseAgent):
+    """行程 Agent：依赖天气+交通结果，调用景点搜索，LLM 规划每日行程。"""
+
+    name = "行程"
+    emoji = "🗺️"
+    system_prompt = ITINERARY_SYSTEM_PROMPT
+
+    async def execute(self, state: dict) -> dict:
+        request = state["request"]
+        weather = state.get("weather_result")
+        transport = state.get("transport_result")
+
+        # 1. 调用 MCP 工具获取景点数据
+        attractions = await self.call_mcp("search_attractions", {
+            "city": request["destination"],
+            "preferences": request.get("preferences", []),
+            "top_k": 12,
         })
-    
-    total_ticket_cost = sum(d["ticket_cost"] for d in daily_plans)
-    
-    return {
-        "city": city,
-        "days": days,
-        "daily_plans": daily_plans,
-        "total_attractions": sum(len(d["attractions"]) for d in daily_plans),
-        "total_ticket_cost": total_ticket_cost,
-        "advice": f"共规划{days}天行程，{sum(len(d['attractions']) for d in daily_plans)}个景点"
-    }
+
+        # 2. 尝试用 LLM 规划行程
+        try:
+            weather_info = ""
+            if weather and "daily" in weather:
+                weather_info = str(weather["daily"])
+
+            transport_info = ""
+            if transport and "recommended" in transport:
+                t = transport["recommended"]
+                transport_info = f"{t.get('type', '')} {t.get('name', '')} 到达{t.get('arrival_time', '')}"
+
+            user_msg = (
+                f"目的地：{request['destination']}\n"
+                f"天数：{request['days']}\n"
+                f"用户偏好：{request.get('preferences', [])}\n"
+                f"天气信息：{weather_info}\n"
+                f"交通信息：{transport_info}\n"
+                f"可用景点：{attractions}\n\n"
+                f"请规划每日行程，输出 JSON 格式。"
+            )
+            messages = self.build_llm_messages(user_msg)
+            llm_result = await self.call_llm(messages, max_tokens=2000)
+
+            result = {
+                "city": request["destination"],
+                "days": request["days"],
+                "daily_plans": self._extract_daily_plans(llm_result),
+                "total_ticket_cost": self._calc_ticket_cost(llm_result, attractions),
+                "advice": f"共规划{request['days']}天行程",
+                "llm_analysis": llm_result,
+                "available_attractions": attractions,
+            }
+        except Exception:
+            # LLM 不可用，回退到内置行程规划
+            result = self._build_fallback_plan(request, weather, attractions)
+
+        state["itinerary_result"] = result
+        self.add_log(state, f"行程规划完成，共{request['days']}天")
+        return state
+
+    def _extract_daily_plans(self, llm_text: str) -> list:
+        """从 LLM 输出中提取 daily_plans。"""
+        import json
+        import re
+
+        # 尝试提取 JSON
+        json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', llm_text, re.DOTALL)
+        if json_match:
+            try:
+                data = json.loads(json_match.group(1))
+                if "daily_plans" in data:
+                    return data["daily_plans"]
+            except json.JSONDecodeError:
+                pass
+
+        # 直接尝试解析整个文本为 JSON
+        try:
+            data = json.loads(llm_text)
+            if isinstance(data, list):
+                return data
+            if "daily_plans" in data:
+                return data["daily_plans"]
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+        return []
+
+    def _calc_ticket_cost(self, llm_text: str, attractions: list) -> float:
+        """计算总门票费用。"""
+        plans = self._extract_daily_plans(llm_text)
+        if plans:
+            return sum(p.get("ticket_cost", 0) for p in plans)
+        # 回退：从景点数据估算
+        return sum(a.get("ticket_price", 0) for a in attractions[:2]) * 3
+
+    def _build_fallback_plan(self, request: dict, weather: dict | None, attractions: list) -> dict:
+        """LLM 不可用时的回退行程规划。"""
+        daily_plans = []
+
+        for day in range(1, request["days"] + 1):
+            weather_cond = "晴"
+            if weather and "daily" in weather and day <= len(weather["daily"]):
+                weather_cond = weather["daily"][day - 1].get("condition", "晴")
+
+            if "雨" in weather_cond:
+                indoor = [a for a in attractions if a.get("category") in ("博物馆", "室内")]
+                selected = indoor[:2] if indoor else attractions[:2]
+            else:
+                idx = (day - 1) * 2
+                selected = attractions[idx:idx + 2] if idx < len(attractions) else attractions[:2]
+
+            ticket_cost = sum(a.get("ticket_price", 0) for a in selected)
+
+            daily_plans.append({
+                "day": day,
+                "date": f"第{day}天",
+                "weather": weather_cond,
+                "morning": f"抵达{request['destination']}" if day == 1 else f"上午：{selected[0]['name'] if selected else '自由活动'}",
+                "afternoon": f"下午：{selected[1]['name'] if len(selected) > 1 else '市区游览'}",
+                "evening": "晚上：品尝当地美食",
+                "attractions": selected,
+                "ticket_cost": ticket_cost,
+            })
+
+        return {
+            "city": request["destination"],
+            "days": request["days"],
+            "daily_plans": daily_plans,
+            "total_ticket_cost": sum(d["ticket_cost"] for d in daily_plans),
+            "advice": f"共规划{request['days']}天行程，{sum(len(d.get('attractions', [])) for d in daily_plans)}个景点",
+        }
+
+
+# 导出实例
+itinerary_agent = ItineraryAgent()

@@ -1,40 +1,80 @@
-"""交通 Agent - 查询航班/高铁"""
+"""交通 Agent — 查询航班/高铁并推荐最优方案。"""
 
-import random
+from tripmind.agents.base import BaseAgent
+from tripmind.prompts import TRANSPORT_SYSTEM_PROMPT
 
 
-async def transport_agent(departure: str, destination: str, days: int) -> dict:
-    """
-    查询交通信息
-    实际项目中可接入携程/12306 API
-    """
-    routes = {
-        ("北京", "成都"): [
-            {"type": "高铁", "name": "G89", "departure_time": "07:00", "arrival_time": "14:00", "duration": "7小时", "price": 780},
-            {"type": "航班", "name": "CA1401", "departure_time": "08:00", "arrival_time": "10:30", "duration": "2小时30分", "price": 1200},
-        ],
-        ("上海", "成都"): [
-            {"type": "高铁", "name": "G1970", "departure_time": "06:30", "arrival_time": "15:30", "duration": "9小时", "price": 850},
-            {"type": "航班", "name": "MU5401", "departure_time": "07:30", "arrival_time": "10:00", "duration": "2小时30分", "price": 1100},
-        ],
-    }
-    
-    key = (departure, destination)
-    if key in routes:
-        options = routes[key]
-    else:
-        options = [
-            {"type": "高铁", "name": "G1234", "departure_time": "08:00", "arrival_time": "15:00", "duration": "7小时", "price": 750},
-            {"type": "航班", "name": "CA1234", "departure_time": "09:00", "arrival_time": "11:30", "duration": "2小时30分", "price": 1150},
-        ]
-    
-    recommended = min(options, key=lambda x: x["price"])
-    
-    return {
-        "departure": departure,
-        "destination": destination,
-        "options": options,
-        "recommended": recommended,
-        "total_cost_round": recommended["price"] * 2,
-        "advice": f"推荐{recommended['type']}：{recommended['name']}，{recommended['price']}元"
-    }
+class TransportAgent(BaseAgent):
+    """交通 Agent：查询航班+高铁信息，LLM 分析推荐。"""
+
+    name = "交通"
+    emoji = "✈️"
+    system_prompt = TRANSPORT_SYSTEM_PROMPT
+
+    async def execute(self, state: dict) -> dict:
+        request = state["request"]
+
+        # 1. 调用 MCP 工具获取交通数据
+        flights = await self.call_mcp("search_flights", {
+            "departure": request["departure_city"],
+            "destination": request["destination"],
+        })
+        trains = await self.call_mcp("search_trains", {
+            "departure": request["departure_city"],
+            "destination": request["destination"],
+        })
+
+        # 2. 合并数据，选择最便宜方案
+        all_options = []
+        if flights:
+            for f in flights:
+                all_options.append({**f, "type": "航班"})
+        if trains:
+            for t in trains:
+                all_options.append({**t, "type": t.get("type", "高铁")})
+
+        # 按价格升序排列
+        all_options.sort(key=lambda x: x.get("price", 9999))
+        recommended = all_options[0] if all_options else {"type": "未知", "price": 0}
+        total_round = recommended["price"] * 2 if recommended["price"] else 0
+
+        # 3. 尝试用 LLM 生成分析
+        try:
+            user_msg = (
+                f"出发地：{request['departure_city']}\n"
+                f"目的地：{request['destination']}\n"
+                f"天数：{request['days']}\n"
+                f"预算：{request['budget']}元\n\n"
+                f"可用航班：{flights}\n"
+                f"可用火车：{trains}\n"
+            )
+            messages = self.build_llm_messages(user_msg)
+            llm_result = await self.call_llm(messages, max_tokens=1000)
+
+            result = {
+                "departure": request["departure_city"],
+                "destination": request["destination"],
+                "options": all_options,
+                "recommended": recommended,
+                "total_cost_round": total_round,
+                "advice": f"推荐{recommended.get('type', '')}：{recommended.get('name', '')}，{recommended.get('price', 0)}元",
+                "llm_analysis": llm_result,
+            }
+        except Exception:
+            # LLM 不可用时使用内置逻辑
+            result = {
+                "departure": request["departure_city"],
+                "destination": request["destination"],
+                "options": all_options,
+                "recommended": recommended,
+                "total_cost_round": total_round,
+                "advice": f"推荐{recommended.get('type', '')}：{recommended.get('name', '')}，{recommended.get('price', 0)}元",
+            }
+
+        state["transport_result"] = result
+        self.add_log(state, f"找到 {len(all_options)} 个交通方案，推荐 {recommended.get('name', '')}")
+        return state
+
+
+# 导出实例，供编排器使用
+transport_agent = TransportAgent()

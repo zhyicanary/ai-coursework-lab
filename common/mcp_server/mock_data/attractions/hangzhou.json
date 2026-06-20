@@ -1,0 +1,98 @@
+[
+  {
+    "name": "西湖",
+    "category": "世界遗产",
+    "ticket_price": 0,
+    "duration": "3-4小时",
+    "description": "世界文化遗产，中国最著名的湖泊景区。\"欲把西湖比西子，淡妆浓抹总相宜\"。可环湖骑行、乘船游览。主要景点有断桥、苏堤、三潭印月等。",
+    "preferences": ["自然风光", "历史文化", "摄影"]
+  },
+  {
+    "name": "灵隐寺",
+    "category": "宗教场所",
+    "ticket_price": 75,
+    "duration": "2-3小时",
+    "description": "中国最古老的佛教寺庙之一，始建于东晋。寺内大雄宝殿雄伟壮观，周围山林幽静，是杭州最重要的宗教圣地。",
+    "preferences": ["宗教", "历史文化", "自然风光"]
+  },
+  {
+    "name": "雷峰塔",
+    "category": "历史遗迹",
+    "ticket_price": 40,
+    "duration": "1-1.5小时",
+    "description": "西湖的标志性建筑，因白蛇传传说而闻名。登塔可俯瞰西湖全景。新塔内保留了旧塔遗址。",
+    "preferences": ["历史文化", "摄影"]
+  },
+  {
+    "name": "宋城",
+    "category": "主题公园",
+    "ticket_price": 300,
+    "duration": "4-5小时",
+    "description": "以南宋文化为主题的大型主题公园，有\"宋城千古情\"大型歌舞表演。园内仿宋建筑和街市氛围浓厚。",
+    "preferences": ["历史文化", "购物", "美食"]
+  },
+  {
+    "name": "断桥",
+    "category": "地标",
+    "ticket_price": 0,
+    "duration": "0.5小时",
+    "description": "西湖最著名的桥，白蛇传中许仙和白娘子相会的地方。冬日雪后桥面雪景\"断桥残雪\"是西湖十景之一。",
+    "preferences": ["历史文化", "摄影"]
+  },
+  {
+    "name": "苏堤",
+    "category": "地标",
+    "ticket_price": 0,
+    "duration": "1小时",
+    "description": "苏轼任杭州知州时修建的湖堤，全长约3公里。堤上六桥起伏，桃柳夹岸，春天\"苏堤春晓\"是西湖十景之首。",
+    "preferences": ["自然风光", "历史文化"]
+  },
+  {
+    "name": "河坊街",
+    "category": "历史街区",
+    "ticket_price": 0,
+    "duration": "1.5-2小时",
+    "description": "杭州保存最完好的古街，保留了清末民初的建筑风格。有各种杭州特色小吃、茶楼、药铺和手工艺品店。",
+    "preferences": ["美食", "购物", "历史文化"]
+  },
+  {
+    "name": "中国茶叶博物馆",
+    "category": "博物馆",
+    "ticket_price": 0,
+    "duration": "1.5小时",
+    "description": "展示中国茶文化的专业博物馆，位于龙井茶产区。可以了解茶的历史、品种、制作工艺，并可品茶。",
+    "preferences": ["博物馆", "历史文化", "美食"]
+  },
+  {
+    "name": "九溪十八涧",
+    "category": "自然风光",
+    "ticket_price": 0,
+    "duration": "2-3小时",
+    "description": "杭州最幽静的自然风景区之一，溪流潺潺，林木葱郁。\"九溪烟树\"是著名的自然景观，适合徒步和摄影。",
+    "preferences": ["自然风光", "运动"]
+  },
+  {
+    "name": "杭州宋韵博物馆",
+    "category": "博物馆",
+    "ticket_price": 0,
+    "duration": "1.5-2小时",
+    "description": "以南宋文化为主题的博物馆，展示了南宋时期杭州作为都城的社会生活、文化艺术和经济发展。",
+    "preferences": ["历史文化", "博物馆"]
+  },
+  {
+    "name": "西溪国家湿地公园",
+    "category": "自然风光",
+    "ticket_price": 80,
+    "duration": "3-4小时",
+    "description": "中国首个国家湿地公园，与西湖、西泠并称杭州\"三西\"。可乘船游览水网密布的湿地景观，生态丰富。",
+    "preferences": ["自然风光", "摄影"]
+  },
+  {
+    "name": "龙井村",
+    "category": "自然风光",
+    "ticket_price": 0,
+    "duration": "1.5-2小时",
+    "description": "西湖龙井茶的原产地，可以参观茶园、了解龙井茶制作过程、品尝正宗龙井茶。周边有徒步路线。",
+    "preferences": ["美食", "自然风光", "历史文化"]
+  }
+]

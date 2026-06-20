@@ -1,0 +1,98 @@
+[
+  {
+    "name": "故宫博物院",
+    "category": "历史遗迹",
+    "ticket_price": 60,
+    "duration": "3-4小时",
+    "description": "明清两代的皇家宫殿，世界最大的宫殿建筑群，收藏了超过180万件珍贵文物。需提前预约。",
+    "preferences": ["历史文化", "博物馆"]
+  },
+  {
+    "name": "长城（八达岭）",
+    "category": "世界遗产",
+    "ticket_price": 40,
+    "duration": "4-5小时",
+    "description": "世界文化遗产，中国象征之一。八达岭长城是最早开放、保存最完好的一段，距离市区约70公里。",
+    "preferences": ["历史文化", "自然风光"]
+  },
+  {
+    "name": "颐和园",
+    "category": "皇家园林",
+    "ticket_price": 30,
+    "duration": "3小时",
+    "description": "中国现存最大的皇家园林，以昆明湖和万寿山为主体，融合了江南园林的秀美与皇家建筑的恢宏。",
+    "preferences": ["历史文化", "自然风光"]
+  },
+  {
+    "name": "天坛公园",
+    "category": "历史遗迹",
+    "ticket_price": 15,
+    "duration": "2小时",
+    "description": "明清两代皇帝祭天的场所，以祈年殿为代表的建筑群体现了中国古代宇宙观，也是北京市民休闲的好去处。",
+    "preferences": ["历史文化"]
+  },
+  {
+    "name": "天安门广场",
+    "category": "地标",
+    "ticket_price": 0,
+    "duration": "1小时",
+    "description": "世界上最大的城市广场，见证了中国许多重大历史事件。可参观人民英雄纪念碑、毛主席纪念堂。",
+    "preferences": ["历史文化"]
+  },
+  {
+    "name": "国家博物馆",
+    "category": "博物馆",
+    "ticket_price": 0,
+    "duration": "3-4小时",
+    "description": "中国最高历史文化殿堂，馆藏数量超过100万件，展示了中华文明的完整发展脉络。需预约。",
+    "preferences": ["历史文化", "博物馆"]
+  },
+  {
+    "name": "什刹海",
+    "category": "历史街区",
+    "ticket_price": 0,
+    "duration": "2小时",
+    "description": "北京著名的历史文化保护区，由前海、后海、西海组成。周边有恭王府、宋庆龄故居等，夜晚酒吧街热闹非凡。",
+    "preferences": ["历史文化", "美食", "购物"]
+  },
+  {
+    "name": "798艺术区",
+    "category": "艺术区",
+    "ticket_price": 0,
+    "duration": "2-3小时",
+    "description": "由旧工厂改造的当代艺术区，汇集了画廊、艺术中心、设计店、咖啡馆，是北京最文艺的地方。",
+    "preferences": ["购物", "艺术"]
+  },
+  {
+    "name": "北海公园",
+    "category": "皇家园林",
+    "ticket_price": 10,
+    "duration": "1.5-2小时",
+    "description": "中国现存最古老、保存最完整的皇家园林之一，以白塔和琼华岛为核心景点。",
+    "preferences": ["历史文化", "自然风光"]
+  },
+  {
+    "name": "恭王府",
+    "category": "历史遗迹",
+    "ticket_price": 40,
+    "duration": "2小时",
+    "description": "清代规模最大的王府，曾为和珅府邸，后为恭亲王奕䜣的王府。花园精美，有\"一座恭王府，半部清朝史\"之说。",
+    "preferences": ["历史文化"]
+  },
+  {
+    "name": "雍和宫",
+    "category": "宗教场所",
+    "ticket_price": 25,
+    "duration": "1.5-2小时",
+    "description": "北京最大的藏传佛教寺院，曾是雍正皇帝的行宫。寺内供奉有18米高的弥勒菩萨像。",
+    "preferences": ["历史文化", "宗教"]
+  },
+  {
+    "name": "南锣鼓巷",
+    "category": "历史街区",
+    "ticket_price": 0,
+    "duration": "1.5-2小时",
+    "description": "北京最古老的街区之一，保留了元代的棋盘式胡同格局。现在是文艺小店和美食的聚集地。",
+    "preferences": ["美食", "购物", "历史文化"]
+  }
+]

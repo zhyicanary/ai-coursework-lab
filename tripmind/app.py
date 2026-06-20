@@ -1,5 +1,6 @@
 import sys
 import subprocess
+import asyncio
 from pathlib import Path
 from functools import lru_cache
 
@@ -220,5 +221,49 @@ with gr.Blocks(title="TripMind - 多Agent旅行规划") as app:
             app.load(get_config, None, [backend, model, api_key, base_url, status])
 
 
+# ─── MCP Server 生命周期管理 ──────────────────────────────
+
+_mcp_process: subprocess.Popen | None = None
+
+
+def start_mcp_server():
+    """启动 MCP Server 子进程（后台运行）。"""
+    global _mcp_process
+    try:
+        project_root = Path(__file__).parent.parent
+        _mcp_process = subprocess.Popen(
+            ["uv", "run", "python", "-m", "common.mcp_server.server"],
+            cwd=project_root,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        print(f"[MCP] Server started (PID: {_mcp_process.pid})")
+    except Exception as e:
+        print(f"[MCP] Server 启动失败：{e}")
+        print("[MCP] Agent 将直接调用 tools.py（不影响功能）")
+
+
+def stop_mcp_server():
+    """关闭 MCP Server 子进程。"""
+    global _mcp_process
+    if _mcp_process is not None:
+        try:
+            _mcp_process.terminate()
+            _mcp_process.wait(timeout=5)
+            print(f"[MCP] Server stopped")
+        except Exception:
+            _mcp_process.kill()
+        _mcp_process = None
+
+
+# 启动 MCP Server（非阻塞）
+try:
+    start_mcp_server()
+except Exception:
+    pass
+
 if __name__ == "__main__":
-    app.launch(server_name="0.0.0.0", server_port=7861, theme=gr.themes.Soft())
+    try:
+        app.launch(server_name="0.0.0.0", server_port=7861, theme=gr.themes.Soft())
+    finally:
+        stop_mcp_server()

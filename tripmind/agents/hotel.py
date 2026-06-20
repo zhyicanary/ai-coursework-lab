@@ -1,35 +1,71 @@
-"""住宿 Agent - 推荐酒店"""
+"""住宿 Agent — 搜索酒店并推荐最优方案。"""
 
-import random
+from tripmind.agents.base import BaseAgent
+from tripmind.prompts import HOTEL_SYSTEM_PROMPT
 
 
-async def hotel_agent(city: str, days: int, budget: float) -> dict:
-    """
-    搜索酒店
-    实际项目中可接入携程/美团 API
-    """
-    max_price = (budget * 0.4) / days
-    
-    hotels = [
-        {"name": "如家酒店", "price": 180, "location": "市中心", "rating": 4.2, "distance_to_center": 0.5},
-        {"name": "汉庭酒店", "price": 200, "location": "火车站附近", "rating": 4.3, "distance_to_center": 1.2},
-        {"name": "全季酒店", "price": 280, "location": "商业区", "rating": 4.5, "distance_to_center": 0.8},
-        {"name": "亚朵酒店", "price": 350, "location": "景区附近", "rating": 4.6, "distance_to_center": 0.3},
-        {"name": "民宿A", "price": 150, "location": "老城区", "rating": 4.4, "distance_to_center": 2.0},
-    ]
-    
-    suitable = [h for h in hotels if h["price"] <= max_price]
-    if not suitable:
-        suitable = hotels[:3]
-    
-    recommended = max(suitable, key=lambda x: x["rating"])
-    
-    return {
-        "city": city,
-        "days": days,
-        "budget_per_night": max_price,
-        "options": suitable,
-        "recommended": recommended,
-        "total_cost": recommended["price"] * days,
-        "advice": f"推荐{recommended['name']}，{recommended['price']}元/晚，评分{recommended['rating']}"
-    }
+class HotelAgent(BaseAgent):
+    """住宿 Agent：搜索酒店，按预算筛选，LLM 推荐。"""
+
+    name = "住宿"
+    emoji = "🏨"
+    system_prompt = HOTEL_SYSTEM_PROMPT
+
+    async def execute(self, state: dict) -> dict:
+        request = state["request"]
+        max_price_per_night = (request["budget"] * 0.4) / request["days"]
+
+        # 1. 调用 MCP 工具获取酒店数据
+        hotels = await self.call_mcp("search_hotels", {
+            "city": request["destination"],
+            "max_price": max_price_per_night,
+        })
+
+        # 2. 筛选推荐
+        suitable = [h for h in hotels if h["price"] <= max_price_per_night]
+        if not suitable:
+            suitable = hotels[:3] if hotels else []
+
+        recommended = max(suitable, key=lambda x: x["rating"]) if suitable else {}
+        total_cost = recommended.get("price", 0) * request["days"]
+
+        # 3. 尝试用 LLM 生成分析
+        try:
+            user_msg = (
+                f"目的地：{request['destination']}\n"
+                f"天数：{request['days']}\n"
+                f"每晚预算上限：{max_price_per_night:.0f}元\n"
+                f"偏好：{request.get('preferences', [])}\n\n"
+                f"可用酒店：{hotels}\n"
+            )
+            messages = self.build_llm_messages(user_msg)
+            llm_result = await self.call_llm(messages, max_tokens=1000)
+
+            result = {
+                "city": request["destination"],
+                "days": request["days"],
+                "budget_per_night": max_price_per_night,
+                "options": suitable,
+                "recommended": recommended,
+                "total_cost": total_cost,
+                "advice": f"推荐{recommended.get('name', '')}，{recommended.get('price', 0)}元/晚，评分{recommended.get('rating', 0)}",
+                "llm_analysis": llm_result,
+            }
+        except Exception:
+            result = {
+                "city": request["destination"],
+                "days": request["days"],
+                "budget_per_night": max_price_per_night,
+                "options": suitable,
+                "recommended": recommended,
+                "total_cost": total_cost,
+                "advice": f"推荐{recommended.get('name', '')}，{recommended.get('price', 0)}元/晚，评分{recommended.get('rating', 0)}",
+            }
+
+        state["hotel_result"] = result
+        self.add_log(state, f"找到 {len(suitable)} 家合适酒店，推荐 {recommended.get('name', '')}")
+        return state
+
+
+# 导出实例
+hotel_agent = HotelAgent()

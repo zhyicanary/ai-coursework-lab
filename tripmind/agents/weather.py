@@ -1,42 +1,56 @@
-"""天气 Agent - 查询天气预报"""
+"""天气 Agent — 查询天气预报并评估出行影响。"""
 
-import random
-from datetime import datetime, timedelta
+from tripmind.agents.base import BaseAgent
+from tripmind.prompts import WEATHER_SYSTEM_PROMPT
 
 
-async def weather_agent(city: str, days: int) -> dict:
-    """
-    查询天气预报
-    实际项目中可接入和风天气 API
-    """
-    conditions = ["晴", "多云", "阴", "小雨", "中雨", "大雨", "雷阵雨"]
-    
-    daily_forecast = []
-    for i in range(days):
-        date = (datetime.now() + timedelta(days=i)).strftime("%Y-%m-%d")
-        condition = random.choice(conditions)
-        temp_high = random.randint(25, 35)
-        temp_low = temp_high - random.randint(5, 10)
-        rain_prob = random.randint(0, 100) if "雨" in condition else random.randint(0, 30)
-        
-        daily_forecast.append({
-            "date": date,
-            "temp_high": temp_high,
-            "temp_low": temp_low,
-            "condition": condition,
-            "rain_prob": rain_prob
+class WeatherAgent(BaseAgent):
+    """天气 Agent：查询天气预报，给出穿衣和出行建议。"""
+
+    name = "天气"
+    emoji = "🌤️"
+    system_prompt = WEATHER_SYSTEM_PROMPT
+
+    async def execute(self, state: dict) -> dict:
+        request = state["request"]
+
+        # 1. 调用 MCP 工具获取天气数据
+        weather_data = await self.call_mcp("get_weather", {
+            "city": request["destination"],
+            "days": request["days"],
         })
-    
-    clothing_advice = "天气温暖，建议穿轻薄衣物"
-    if any(d["temp_high"] > 32 for d in daily_forecast):
-        clothing_advice = "天气炎热，注意防晒补水"
-    if any("雨" in d["condition"] for d in daily_forecast):
-        clothing_advice += "，建议携带雨具"
-    
-    return {
-        "city": city,
-        "days": days,
-        "daily": daily_forecast,
-        "clothing_advice": clothing_advice,
-        "impact_on_travel": "天气总体适宜出行" if not any(d["rain_prob"] > 70 for d in daily_forecast) else "部分日期可能有雨，建议备选室内景点"
-    }
+
+        # 2. 尝试用 LLM 优化分析
+        try:
+            daily = weather_data.get("daily", [])
+            user_msg = (
+                f"城市：{request['destination']}\n"
+                f"天数：{request['days']}\n"
+                f"天气预报数据：{daily}\n"
+            )
+            messages = self.build_llm_messages(user_msg)
+            llm_result = await self.call_llm(messages, max_tokens=500)
+
+            result = {
+                **weather_data,
+                "city": request["destination"],
+                "llm_analysis": llm_result,
+            }
+        except Exception:
+            result = {
+                **weather_data,
+                "city": request["destination"],
+            }
+
+        state["weather_result"] = result
+        daily = result.get("daily", [])
+        summary = f"{request['destination']}{request['days']}天天气"
+        if daily:
+            conditions = [d.get("condition", "") for d in daily]
+            summary += f"：{'/'.join(conditions)}"
+        self.add_log(state, summary)
+        return state
+
+
+# 导出实例
+weather_agent = WeatherAgent()

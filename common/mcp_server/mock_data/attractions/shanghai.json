@@ -1,0 +1,98 @@
+[
+  {
+    "name": "外滩",
+    "category": "地标",
+    "ticket_price": 0,
+    "duration": "1.5-2小时",
+    "description": "上海最具标志性的景观带，黄浦江西岸汇集了52幢风格各异的万国建筑博览群，对岸是陆家嘴现代摩天楼群。",
+    "preferences": ["历史文化", "摄影"]
+  },
+  {
+    "name": "东方明珠塔",
+    "category": "地标",
+    "ticket_price": 180,
+    "duration": "2小时",
+    "description": "上海地标性建筑，高468米。登上观景台可360度俯瞰上海全景，塔内有历史陈列馆和空中旋转餐厅。",
+    "preferences": ["摄影"]
+  },
+  {
+    "name": "豫园",
+    "category": "古典园林",
+    "ticket_price": 30,
+    "duration": "1.5-2小时",
+    "description": "明代江南古典园林，建于1559年。园内有亭台楼阁、假山流水，体现了江南园林的精巧雅致。",
+    "preferences": ["历史文化", "自然风光"]
+  },
+  {
+    "name": "上海博物馆",
+    "category": "博物馆",
+    "ticket_price": 0,
+    "duration": "2-3小时",
+    "description": "中国古代艺术博物馆，馆藏珍贵文物12万件，以青铜器、陶瓷器、书画为特色。免费参观。",
+    "preferences": ["历史文化", "博物馆"]
+  },
+  {
+    "name": "南京路步行街",
+    "category": "商业街",
+    "ticket_price": 0,
+    "duration": "1.5-2小时",
+    "description": "中国最著名的商业街之一，被誉为\"中华第一商业街\"。汇集了各大品牌商店、老字号和各类美食。",
+    "preferences": ["购物", "美食"]
+  },
+  {
+    "name": "田子坊",
+    "category": "艺术区",
+    "ticket_price": 0,
+    "duration": "1.5-2小时",
+    "description": "上海最具特色的弄堂艺术区，由石库门老弄堂改造而成，汇集了画廊、手工艺品店、特色咖啡馆和餐厅。",
+    "preferences": ["购物", "美食", "艺术"]
+  },
+  {
+    "name": "上海迪士尼乐园",
+    "category": "主题乐园",
+    "ticket_price": 399,
+    "duration": "8-10小时",
+    "description": "中国大陆首座迪士尼主题乐园，有七大主题园区。包含梦幻世界、探险岛等，适合全年龄段游玩。",
+    "preferences": ["亲子", "购物"]
+  },
+  {
+    "name": "朱家角古镇",
+    "category": "古镇",
+    "ticket_price": 60,
+    "duration": "3-4小时",
+    "description": "上海保存最完好的江南水乡古镇，有\"上海威尼斯\"之称。小桥流水、明清建筑，可乘船游览。",
+    "preferences": ["历史文化", "自然风光", "美食"]
+  },
+  {
+    "name": "上海自然博物馆",
+    "category": "博物馆",
+    "ticket_price": 30,
+    "duration": "2-3小时",
+    "description": "中国最大最全的自然博物馆之一，展出大量恐龙化石、动植物标本和矿物宝石。",
+    "preferences": ["博物馆", "亲子"]
+  },
+  {
+    "name": "武康路",
+    "category": "历史街区",
+    "ticket_price": 0,
+    "duration": "1.5小时",
+    "description": "上海最具人文气息的马路之一，保留了众多优秀历史建筑，浓缩了上海近代百年历史。适合漫步和拍照。",
+    "preferences": ["历史文化", "摄影"]
+  },
+  {
+    "name": "上海中心大厦",
+    "category": "地标",
+    "ticket_price": 160,
+    "duration": "1.5小时",
+    "description": "中国第一高楼，高632米。118层观光厅可360度俯瞰上海全景，有世界最快的电梯。",
+    "preferences": ["摄影"]
+  },
+  {
+    "name": "城隍庙",
+    "category": "宗教场所",
+    "ticket_price": 10,
+    "duration": "1-1.5小时",
+    "description": "上海著名道教宫观，始建于明代。城隍庙周边的小吃广场是品尝上海特色小吃（小笼包、生煎等）的好去处。",
+    "preferences": ["历史文化", "美食", "宗教"]
+  }
+]

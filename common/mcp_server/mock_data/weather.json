@@ -1,0 +1,38 @@
+{
+  "成都": {
+    "conditions": ["晴", "多云", "阴", "小雨", "中雨"],
+    "temp_range": [20, 35],
+    "humid": "中等",
+    "clothing_advice_base": "成都气候湿润，建议穿着透气舒适的衣物"
+  },
+  "北京": {
+    "conditions": ["晴", "多云", "阴", "小雨", "雷阵雨"],
+    "temp_range": [15, 35],
+    "humid": "干燥",
+    "clothing_advice_base": "北京昼夜温差大，建议早晚备一件外套"
+  },
+  "上海": {
+    "conditions": ["晴", "多云", "阴", "小雨", "中雨", "雷阵雨"],
+    "temp_range": [18, 35],
+    "humid": "较高",
+    "clothing_advice_base": "上海湿度较高，建议穿着透气防潮的衣物，随身带伞"
+  },
+  "西安": {
+    "conditions": ["晴", "多云", "阴", "小雨"],
+    "temp_range": [15, 33],
+    "humid": "干燥",
+    "clothing_advice_base": "西安气候干燥，注意补水防晒"
+  },
+  "广州": {
+    "conditions": ["晴", "多云", "阴", "小雨", "中雨", "大雨", "雷阵雨"],
+    "temp_range": [25, 38],
+    "humid": "高",
+    "clothing_advice_base": "广州炎热潮湿，建议穿轻薄透气的衣物，注意防暑"
+  },
+  "杭州": {
+    "conditions": ["晴", "多云", "阴", "小雨", "中雨"],
+    "temp_range": [18, 35],
+    "humid": "较高",
+    "clothing_advice_base": "杭州湿度较高，建议随身带伞"
+  }
+}

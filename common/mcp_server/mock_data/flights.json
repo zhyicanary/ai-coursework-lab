@@ -1,0 +1,50 @@
+{
+  "北京-成都": [
+    {"flight_no": "CA1401", "departure": "北京首都", "arrival": "成都天府", "departure_time": "08:00", "arrival_time": "10:30", "price": 1200, "airline": "国航"},
+    {"flight_no": "MU5401", "departure": "北京大兴", "arrival": "成都天府", "departure_time": "14:00", "arrival_time": "16:45", "price": 980, "airline": "东航"},
+    {"flight_no": "3U8882", "departure": "北京首都", "arrival": "成都双流", "departure_time": "17:30", "arrival_time": "20:00", "price": 1050, "airline": "川航"}
+  ],
+  "上海-成都": [
+    {"flight_no": "MU5401", "departure": "上海浦东", "arrival": "成都天府", "departure_time": "07:30", "arrival_time": "10:00", "price": 1100, "airline": "东航"},
+    {"flight_no": "CA4501", "departure": "上海虹桥", "arrival": "成都双流", "departure_time": "11:00", "arrival_time": "14:00", "price": 950, "airline": "国航"},
+    {"flight_no": "FM9401", "departure": "上海浦东", "arrival": "成都天府", "departure_time": "16:30", "arrival_time": "19:30", "price": 880, "airline": "上航"}
+  ],
+  "北京-上海": [
+    {"flight_no": "CA1501", "departure": "北京首都", "arrival": "上海虹桥", "departure_time": "07:00", "arrival_time": "09:00", "price": 1150, "airline": "国航"},
+    {"flight_no": "MU5102", "departure": "北京大兴", "arrival": "上海浦东", "departure_time": "10:30", "arrival_time": "12:30", "price": 1080, "airline": "东航"},
+    {"flight_no": "HO1252", "departure": "北京首都", "arrival": "上海虹桥", "departure_time": "15:00", "arrival_time": "17:15", "price": 950, "airline": "吉祥航空"}
+  ],
+  "北京-西安": [
+    {"flight_no": "CA1201", "departure": "北京首都", "arrival": "西安咸阳", "departure_time": "08:30", "arrival_time": "10:30", "price": 850, "airline": "国航"},
+    {"flight_no": "MU2102", "departure": "北京大兴", "arrival": "西安咸阳", "departure_time": "13:00", "arrival_time": "15:00", "price": 720, "airline": "东航"}
+  ],
+  "上海-西安": [
+    {"flight_no": "MU2151", "departure": "上海浦东", "arrival": "西安咸阳", "departure_time": "07:45", "arrival_time": "10:15", "price": 920, "airline": "东航"},
+    {"flight_no": "HO1211", "departure": "上海虹桥", "arrival": "西安咸阳", "departure_time": "14:30", "arrival_time": "17:00", "price": 800, "airline": "吉祥航空"}
+  ],
+  "北京-广州": [
+    {"flight_no": "CA1301", "departure": "北京首都", "arrival": "广州白云", "departure_time": "08:00", "arrival_time": "11:00", "price": 1350, "airline": "国航"},
+    {"flight_no": "CZ3102", "departure": "北京大兴", "arrival": "广州白云", "departure_time": "12:30", "arrival_time": "15:30", "price": 1200, "airline": "南航"},
+    {"flight_no": "HU7801", "departure": "北京首都", "arrival": "广州白云", "departure_time": "17:00", "arrival_time": "20:00", "price": 1100, "airline": "海航"}
+  ],
+  "上海-广州": [
+    {"flight_no": "CZ3501", "departure": "上海浦东", "arrival": "广州白云", "departure_time": "09:00", "arrival_time": "11:00", "price": 1050, "airline": "南航"},
+    {"flight_no": "MU5301", "departure": "上海虹桥", "arrival": "广州白云", "departure_time": "14:00", "arrival_time": "16:00", "price": 980, "airline": "东航"}
+  ],
+  "北京-杭州": [
+    {"flight_no": "CA1701", "departure": "北京首都", "arrival": "杭州萧山", "departure_time": "07:30", "arrival_time": "09:30", "price": 1050, "airline": "国航"},
+    {"flight_no": "MF8122", "departure": "北京大兴", "arrival": "杭州萧山", "departure_time": "13:00", "arrival_time": "15:00", "price": 920, "airline": "厦航"}
+  ],
+  "上海-杭州": [
+    {"flight_no": "CA1765", "departure": "上海浦东", "arrival": "杭州萧山", "departure_time": "08:00", "arrival_time": "08:40", "price": 480, "airline": "国航"},
+    {"flight_no": "MU5651", "departure": "上海虹桥", "arrival": "杭州萧山", "departure_time": "15:30", "arrival_time": "16:10", "price": 400, "airline": "东航"}
+  ],
+  "广州-成都": [
+    {"flight_no": "CZ3401", "departure": "广州白云", "arrival": "成都双流", "departure_time": "08:30", "arrival_time": "10:30", "price": 1050, "airline": "南航"},
+    {"flight_no": "3U8734", "departure": "广州白云", "arrival": "成都天府", "departure_time": "14:00", "arrival_time": "16:00", "price": 900, "airline": "川航"}
+  ],
+  "西安-成都": [
+    {"flight_no": "3U8630", "departure": "西安咸阳", "arrival": "成都双流", "departure_time": "07:00", "arrival_time": "08:30", "price": 550, "airline": "川航"},
+    {"flight_no": "CA4201", "departure": "西安咸阳", "arrival": "成都天府", "departure_time": "12:00", "arrival_time": "13:30", "price": 500, "airline": "国航"}
+  ]
+}

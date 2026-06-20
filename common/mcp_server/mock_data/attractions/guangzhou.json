@@ -1,0 +1,98 @@
+[
+  {
+    "name": "广州塔",
+    "category": "地标",
+    "ticket_price": 150,
+    "duration": "1.5-2小时",
+    "description": "昵称\"小蛮腰\"，高600米，是中国第一高塔。塔顶有摩天轮和空中漫步栈道，可俯瞰珠江夜景。",
+    "preferences": ["摄影"]
+  },
+  {
+    "name": "陈家祠",
+    "category": "历史遗迹",
+    "ticket_price": 10,
+    "duration": "1.5小时",
+    "description": "广东现存规模最大、保存最完整的岭南传统祠堂建筑，以精美的木雕、砖雕、石雕、陶塑和灰塑闻名。",
+    "preferences": ["历史文化"]
+  },
+  {
+    "name": "白云山",
+    "category": "自然风光",
+    "ticket_price": 5,
+    "duration": "3-4小时",
+    "description": "广州的城市绿肺，主峰摩星岭海拔382米。可爬山、乘坐缆车，山顶俯瞰广州全景。",
+    "preferences": ["自然风光", "运动"]
+  },
+  {
+    "name": "沙面岛",
+    "category": "历史街区",
+    "ticket_price": 0,
+    "duration": "1.5-2小时",
+    "description": "曾是英法租界，保留了150多座欧洲风格建筑。岛上有古树、教堂、领事馆遗址，是广州最具异国风情的地方。",
+    "preferences": ["历史文化", "摄影"]
+  },
+  {
+    "name": "珠江夜游",
+    "category": "休闲",
+    "ticket_price": 80,
+    "duration": "1-1.5小时",
+    "description": "乘坐游船欣赏珠江两岸的灯光秀，沿途可见广州塔、海心沙、广州大桥等地标。",
+    "preferences": ["摄影", "休闲"]
+  },
+  {
+    "name": "北京路步行街",
+    "category": "商业街",
+    "ticket_price": 0,
+    "duration": "1.5-2小时",
+    "description": "广州最繁华的商业步行街，千年古道遗址就在路面玻璃下展示。周边有众多老字号和特色小吃。",
+    "preferences": ["购物", "美食", "历史文化"]
+  },
+  {
+    "name": "长隆野生动物世界",
+    "category": "主题乐园",
+    "ticket_price": 280,
+    "duration": "5-6小时",
+    "description": "亚洲最大的野生动物主题公园，拥有从世界各地引进的500多种珍稀动物。可乘坐小火车深入动物散养区。",
+    "preferences": ["亲子", "自然风光"]
+  },
+  {
+    "name": "越秀公园",
+    "category": "公园",
+    "ticket_price": 0,
+    "duration": "1.5-2小时",
+    "description": "广州最大的综合性公园，有五羊石雕（广州标志）、镇海楼（广州博物馆）等景点。",
+    "preferences": ["历史文化", "休闲"]
+  },
+  {
+    "name": "圣心大教堂",
+    "category": "宗教场所",
+    "ticket_price": 0,
+    "duration": "0.5-1小时",
+    "description": "中国最大的石结构哥特式教堂，建于1863年，可与巴黎圣母院媲美。彩色玻璃窗非常精美。",
+    "preferences": ["历史文化", "宗教", "摄影"]
+  },
+  {
+    "name": "上下九步行街",
+    "category": "商业街",
+    "ticket_price": 0,
+    "duration": "1.5-2小时",
+    "description": "广州最有名的骑楼老街，充满了岭南特色的建筑风格。以平价商品和地道广州小吃闻名。",
+    "preferences": ["购物", "美食"]
+  },
+  {
+    "name": "广州博物馆（镇海楼）",
+    "category": "博物馆",
+    "ticket_price": 10,
+    "duration": "1.5小时",
+    "description": "位于越秀公园内的镇海楼，俗称\"五层楼\"，是广州的标志性古建筑。馆内展示广州6000年的城市发展史。",
+    "preferences": ["历史文化", "博物馆"]
+  },
+  {
+    "name": "岭南印象园",
+    "category": "主题公园",
+    "ticket_price": 60,
+    "duration": "2-3小时",
+    "description": "展示岭南传统文化的主题园区，复原了岭南民居、街巷、祠堂等场景，有各种民间表演和非遗展示。",
+    "preferences": ["历史文化", "美食"]
+  }
+]

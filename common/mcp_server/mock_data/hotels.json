@@ -1,0 +1,44 @@
+{
+  "成都": [
+    {"name": "如家酒店（春熙路店）", "price": 180, "location": "春熙路", "rating": 4.2, "distance_to_center": 0.5},
+    {"name": "汉庭酒店（火车东站店）", "price": 200, "location": "火车东站", "rating": 4.3, "distance_to_center": 1.2},
+    {"name": "全季酒店（锦里店）", "price": 280, "location": "锦里", "rating": 4.5, "distance_to_center": 0.8},
+    {"name": "亚朵酒店（宽窄巷子店）", "price": 350, "location": "宽窄巷子", "rating": 4.6, "distance_to_center": 0.3},
+    {"name": "民宿·巷里", "price": 150, "location": "老城区", "rating": 4.4, "distance_to_center": 2.0}
+  ],
+  "北京": [
+    {"name": "如家酒店（前门店）", "price": 220, "location": "前门", "rating": 4.1, "distance_to_center": 1.0},
+    {"name": "汉庭酒店（天安门店）", "price": 260, "location": "天安门", "rating": 4.3, "distance_to_center": 0.5},
+    {"name": "全季酒店（王府井店）", "price": 350, "location": "王府井", "rating": 4.5, "distance_to_center": 0.3},
+    {"name": "亚朵酒店（三里屯店）", "price": 400, "location": "三里屯", "rating": 4.7, "distance_to_center": 2.0},
+    {"name": "北京四合院民宿", "price": 300, "location": "后海", "rating": 4.6, "distance_to_center": 1.5}
+  ],
+  "上海": [
+    {"name": "如家酒店（南京路店）", "price": 230, "location": "南京路", "rating": 4.2, "distance_to_center": 0.5},
+    {"name": "汉庭酒店（外滩店）", "price": 280, "location": "外滩", "rating": 4.4, "distance_to_center": 0.3},
+    {"name": "全季酒店（静安寺店）", "price": 340, "location": "静安寺", "rating": 4.6, "distance_to_center": 1.0},
+    {"name": "亚朵酒店（陆家嘴店）", "price": 420, "location": "陆家嘴", "rating": 4.7, "distance_to_center": 2.0},
+    {"name": "上海弄堂民宿", "price": 250, "location": "田子坊", "rating": 4.5, "distance_to_center": 1.5}
+  ],
+  "西安": [
+    {"name": "如家酒店（钟楼店）", "price": 160, "location": "钟楼", "rating": 4.2, "distance_to_center": 0.3},
+    {"name": "汉庭酒店（大雁塔店）", "price": 190, "location": "大雁塔", "rating": 4.4, "distance_to_center": 1.5},
+    {"name": "全季酒店（回民街店）", "price": 250, "location": "回民街", "rating": 4.5, "distance_to_center": 0.8},
+    {"name": "亚朵酒店（大唐不夜城店）", "price": 320, "location": "大唐不夜城", "rating": 4.6, "distance_to_center": 1.0},
+    {"name": "西安古城民宿", "price": 130, "location": "城墙内", "rating": 4.3, "distance_to_center": 0.5}
+  ],
+  "广州": [
+    {"name": "如家酒店（北京路店）", "price": 200, "location": "北京路", "rating": 4.1, "distance_to_center": 0.5},
+    {"name": "汉庭酒店（珠江新城店）", "price": 260, "location": "珠江新城", "rating": 4.3, "distance_to_center": 1.0},
+    {"name": "全季酒店（广州塔店）", "price": 330, "location": "广州塔", "rating": 4.5, "distance_to_center": 1.5},
+    {"name": "亚朵酒店（天河城店）", "price": 380, "location": "天河", "rating": 4.6, "distance_to_center": 2.0},
+    {"name": "广州西关民宿", "price": 170, "location": "荔湾", "rating": 4.4, "distance_to_center": 2.5}
+  ],
+  "杭州": [
+    {"name": "如家酒店（西湖店）", "price": 210, "location": "西湖", "rating": 4.2, "distance_to_center": 0.5},
+    {"name": "汉庭酒店（武林广场店）", "price": 240, "location": "武林广场", "rating": 4.3, "distance_to_center": 1.0},
+    {"name": "全季酒店（灵隐寺店）", "price": 310, "location": "灵隐寺", "rating": 4.5, "distance_to_center": 3.0},
+    {"name": "亚朵酒店（钱江新城店）", "price": 370, "location": "钱江新城", "rating": 4.6, "distance_to_center": 2.5},
+    {"name": "杭州湖景民宿", "price": 280, "location": "西湖景区", "rating": 4.7, "distance_to_center": 1.0}
+  ]
+}

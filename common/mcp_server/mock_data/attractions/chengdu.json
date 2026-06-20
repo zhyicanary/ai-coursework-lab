@@ -1,0 +1,98 @@
+[
+  {
+    "name": "宽窄巷子",
+    "category": "历史街区",
+    "ticket_price": 0,
+    "duration": "2-3小时",
+    "description": "成都著名的历史文化街区，由宽巷子、窄巷子和井巷子组成，保留了清朝古街道的格局。可以体验成都慢生活、品尝地道小吃。",
+    "preferences": ["历史文化", "美食", "购物"]
+  },
+  {
+    "name": "锦里",
+    "category": "商业街",
+    "ticket_price": 0,
+    "duration": "2小时",
+    "description": "武侯祠旁边的仿古商业街，以三国文化为主题，有各种特色小吃、手工艺品和川剧变脸表演。",
+    "preferences": ["美食", "购物", "历史文化"]
+  },
+  {
+    "name": "都江堰",
+    "category": "世界遗产",
+    "ticket_price": 80,
+    "duration": "3-4小时",
+    "description": "世界文化遗产，始建于秦昭王末年，是全世界迄今为止年代最久、唯一留存、以无坝引水为特征的水利工程。",
+    "preferences": ["历史文化", "自然风光"]
+  },
+  {
+    "name": "青城山",
+    "category": "自然风光",
+    "ticket_price": 80,
+    "duration": "4-5小时",
+    "description": "道教名山，世界文化遗产，以幽静的自然风光和道教文化闻名。分前山（道观集中）和后山（自然风光）两部分。",
+    "preferences": ["自然风光", "历史文化"]
+  },
+  {
+    "name": "成都博物馆",
+    "category": "博物馆",
+    "ticket_price": 0,
+    "duration": "2-3小时",
+    "description": "展示成都历史文化的综合性博物馆，馆藏丰富，从古蜀文明到近代成都的历史变迁。免费参观，需要预约。",
+    "preferences": ["历史文化", "博物馆"]
+  },
+  {
+    "name": "大熊猫繁育研究基地",
+    "category": "动物园",
+    "ticket_price": 55,
+    "duration": "3-4小时",
+    "description": "世界著名的大熊猫保护研究机构，可以近距离观察大熊猫的生活习性，还有小熊猫、黑颈鹤等珍稀动物。",
+    "preferences": ["自然风光", "亲子"]
+  },
+  {
+    "name": "武侯祠",
+    "category": "历史遗迹",
+    "ticket_price": 50,
+    "duration": "2小时",
+    "description": "纪念诸葛亮的祠庙，中国唯一的君臣合祀祠庙，三国文化的重要遗址。",
+    "preferences": ["历史文化"]
+  },
+  {
+    "name": "杜甫草堂",
+    "category": "历史遗迹",
+    "ticket_price": 50,
+    "duration": "1.5-2小时",
+    "description": "唐代大诗人杜甫在成都的故居，中国文学史上的重要地标，园林清幽雅致。",
+    "preferences": ["历史文化"]
+  },
+  {
+    "name": "春熙路",
+    "category": "商业街",
+    "ticket_price": 0,
+    "duration": "1.5-2小时",
+    "description": "成都最繁华的商业步行街，时尚购物中心聚集地，也是成都美女、美食的集中地。",
+    "preferences": ["购物", "美食"]
+  },
+  {
+    "name": "人民公园",
+    "category": "公园",
+    "ticket_price": 0,
+    "duration": "1-2小时",
+    "description": "成都本地人最爱的休闲公园，可以体验成都的茶馆文化、掏耳朵、看大爷大妈跳舞。",
+    "preferences": ["休闲", "美食"]
+  },
+  {
+    "name": "文殊院",
+    "category": "宗教场所",
+    "ticket_price": 0,
+    "duration": "1-1.5小时",
+    "description": "成都保存最完整的佛教寺庙之一，始建于隋朝，寺内有丰富的佛教文物。旁边的文殊坊也有不少小吃。",
+    "preferences": ["历史文化", "宗教"]
+  },
+  {
+    "name": "望江楼公园",
+    "category": "公园",
+    "ticket_price": 0,
+    "duration": "1.5小时",
+    "description": "以唐代女诗人薛涛命名的公园，园内有望江楼古建筑群和大量的竹子品种，适合悠闲散步。",
+    "preferences": ["自然风光", "历史文化"]
+  }
+]
