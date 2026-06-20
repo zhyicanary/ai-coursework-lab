@@ -9,7 +9,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import gradio as gr
 from common.llm_client import llm
-from tripmind.orchestrator import TravelRequest, run_travel_planner
+from tripmind.orchestrator import TravelRequest, run_travel_planner, adjust_plan
 
 
 def update_settings(backend, model, api_key, base_url):
@@ -114,7 +114,7 @@ def get_config():
 async def plan_travel(destination, days, budget, departure, preferences):
     """运行多 Agent 旅游规划"""
     if not destination or not days or not budget or not departure:
-        return "请填写所有必填字段", "", ""
+        return "请填写所有必填字段", "", "", None
     
     request = TravelRequest(
         destination=destination,
@@ -134,11 +134,35 @@ async def plan_travel(destination, days, budget, departure, preferences):
         agent_status += f"交通: {'✅' if result.get('transport_result') else '❌'}\n"
         agent_status += f"住宿: {'✅' if result.get('hotel_result') else '❌'}\n"
         agent_status += f"行程: {'✅' if result.get('itinerary_result') else '❌'}\n"
-        agent_status += f"预算: {'✅' if result.get('budget_result') else '❌'}"
+        agent_status += f"预算: {'✅' if result.get('budget_result') else '❌'}\n"
+        agent_status += f"超预算调整: {'⚠️已调整' if result.get('budget_adjusted') else '—'}"
         
-        return final_plan, logs, agent_status
+        return final_plan, logs, agent_status, result
     except Exception as e:
-        return f"规划失败: {str(e)}", "", ""
+        return f"规划失败: {str(e)}", "", "", None
+
+
+async def handle_adjustment(instruction, previous_state):
+    """处理用户调整指令，重新运行受影响 Agent。"""
+    if not instruction or not previous_state:
+        return "请输入调整指令", "", "", None
+    
+    try:
+        result = await adjust_plan(previous_state, instruction)
+        
+        logs = "\n".join([f"[{log['step']}] {log['message']}" for log in result.get("agent_logs", [])])
+        final_plan = result.get("final_plan", "调整失败")
+        
+        agent_status = f"天气: {'✅' if result.get('weather_result') else '❌'}\n"
+        agent_status += f"交通: {'✅' if result.get('transport_result') else '❌'}\n"
+        agent_status += f"住宿: {'✅' if result.get('hotel_result') else '❌'}\n"
+        agent_status += f"行程: {'✅' if result.get('itinerary_result') else '❌'}\n"
+        agent_status += f"预算: {'✅' if result.get('budget_result') else '❌'}\n"
+        agent_status += f"超预算调整: {'⚠️已调整' if result.get('budget_adjusted') else '—'}"
+        
+        return final_plan, logs, agent_status, result
+    except Exception as e:
+        return f"调整失败: {str(e)}", "", "", None
 
 
 async def chat(message, history):
@@ -162,9 +186,12 @@ with gr.Blocks(title="TripMind - 多Agent旅行规划") as app:
             with gr.Row():
                 departure = gr.Textbox(label="出发地", placeholder="北京")
                 preferences = gr.Textbox(label="偏好(逗号分隔)", placeholder="美食,历史文化")
-            
+
             plan_btn = gr.Button("🚀 开始规划", variant="primary")
-            
+
+            # 存储上一次规划的状态（供调整使用）
+            plan_state = gr.State()
+
             with gr.Row():
                 with gr.Column():
                     gr.Markdown("### 📊 Agent 执行状态")
@@ -172,14 +199,33 @@ with gr.Blocks(title="TripMind - 多Agent旅行规划") as app:
                 with gr.Column():
                     gr.Markdown("### 📨 Agent 通信日志")
                     agent_logs = gr.Textbox(label="日志", interactive=False, lines=8)
-            
+
             gr.Markdown("### 📄 旅行方案")
             final_plan = gr.Markdown()
-            
+
+            # ── 追问调整区域 ──
+            with gr.Accordion("🔄 追问调整方案", open=False):
+                gr.Markdown("对生成的方案不满意？输入调整指令，仅重算受影响 Agent。")
+                with gr.Row():
+                    adjustment_input = gr.Textbox(
+                        label="调整指令",
+                        placeholder='例如："预算提高到 5000"、"换便宜的酒店"、"偏好美食、自然风光"、"改成去西安"',
+                        scale=5,
+                    )
+                    adjust_btn = gr.Button("📋 应用调整", variant="secondary", scale=1)
+
+            # 规划按钮
             plan_btn.click(
                 plan_travel,
                 [destination, days, budget, departure, preferences],
-                [final_plan, agent_logs, agent_status]
+                [final_plan, agent_logs, agent_status, plan_state]
+            )
+
+            # 调整按钮
+            adjust_btn.click(
+                handle_adjustment,
+                [adjustment_input, plan_state],
+                [final_plan, agent_logs, agent_status, plan_state]
             )
 
         with gr.Tab("对话"):
