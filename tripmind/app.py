@@ -282,19 +282,23 @@ with gr.Blocks(title="TripMind - 多Agent旅行规划") as app:
                 on_backend_change,
                 [backend],
                 [model, api_key, base_url],
+                show_progress="hidden",
             ).then(
                 refresh_model_list,
                 [backend],
                 [model],
+                show_progress="hidden",
             )
 
             # 页面加载时回显当前配置，然后后台拉取模型列表
             app.load(
-                get_config, None, [backend, model, api_key, base_url, status]
+                get_config, None, [backend, model, api_key, base_url, status],
+                show_progress="hidden",
             ).then(
                 refresh_model_list,
                 [backend],
                 [model],
+                show_progress="hidden",
             )
 
 
@@ -306,6 +310,8 @@ _mcp_process: subprocess.Popen | None = None
 def start_mcp_server():
     """启动 MCP Server 子进程（后台运行）。"""
     global _mcp_process
+    if _mcp_process is not None and _mcp_process.poll() is None:
+        return
     try:
         project_root = Path(__file__).parent.parent
         _mcp_process = subprocess.Popen(
@@ -323,23 +329,25 @@ def start_mcp_server():
 def stop_mcp_server():
     """关闭 MCP Server 子进程。"""
     global _mcp_process
-    if _mcp_process is not None:
+    if _mcp_process is None:
+        return
+    try:
+        _mcp_process.terminate()
+        _mcp_process.wait(timeout=5)
+        print(f"[MCP] Server stopped (PID: {_mcp_process.pid})")
+    except Exception:
         try:
-            _mcp_process.terminate()
-            _mcp_process.wait(timeout=5)
-            print(f"[MCP] Server stopped")
-        except Exception:
             _mcp_process.kill()
-        _mcp_process = None
+        except Exception:
+            pass
+    _mcp_process = None
 
-
-# 启动 MCP Server（非阻塞）
-try:
-    start_mcp_server()
-except Exception:
-    pass
 
 if __name__ == "__main__":
+    # Gradio 热重载模式下，reload 线程不应管理 MCP 生命周期
+    if not app._is_running_in_reload_thread:
+        start_mcp_server()
+
     try:
         app.launch(server_name="0.0.0.0", server_port=7861, theme=gr.themes.Soft())
     finally:
