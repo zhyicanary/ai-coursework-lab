@@ -1,5 +1,6 @@
 import sys
 import subprocess
+import tempfile
 import asyncio
 import warnings
 from pathlib import Path
@@ -13,7 +14,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import gradio as gr
 from common.llm_client import llm
-from tripmind.orchestrator import TravelRequest, run_travel_planner, adjust_plan
+from tripmind.types import TravelRequest
+from tripmind.orchestrator import run_travel_planner, run_travel_planner_stream, adjust_plan
 
 
 def update_settings(backend, model, api_key, base_url):
@@ -124,59 +126,117 @@ def get_config():
     )
 
 
-async def plan_travel(destination, days, budget, departure, preferences):
-    """运行多 Agent 旅游规划"""
+def _format_agent_status(state: dict) -> str:
+    """将 state 中的 Agent 结果格式化为状态面板文本。"""
+    agents = [
+        ("🌤️ 天气", "weather_result"),
+        ("✈️ 交通", "transport_result"),
+        ("🏨 住宿", "hotel_result"),
+        ("🗺️ 行程", "itinerary_result"),
+        ("💰 预算", "budget_result"),
+    ]
+    lines = []
+    for label, key in agents:
+        val = state.get(key)
+        if val is None:
+            lines.append(f"{label}: ⏳ 等待")
+        elif val.get("error"):
+            lines.append(f"{label}: ❌ 失败")
+        else:
+            lines.append(f"{label}: ✅ 完成")
+    lines.append(f"💡 调整: {'⚠️ 已调整' if state.get('budget_adjusted') else '—'}")
+    return "\n".join(lines)
+
+
+def _get_default_status() -> str:
+    """初始状态面板文本。"""
+    agents = ["🌤️ 天气", "✈️ 交通", "🏨 住宿", "🗺️ 行程", "💰 预算"]
+    return "\n".join(f"{a}: ⏳ 等待" for a in agents) + "\n💡 调整: —"
+
+
+async def plan_travel(destination, days, budget, departure, preferences, progress=gr.Progress()):
+    """运行多 Agent 旅游规划（流式输出，逐节点更新 UI）。"""
     if not destination or not days or not budget or not departure:
         gr.Warning("请填写所有必填字段")
-        return "请填写所有必填字段", "", "", None
-    
+        yield "请填写所有必填字段", "", _get_default_status(), None, gr.update(visible=False)
+        return
+
     request = TravelRequest(
         destination=destination,
         days=int(days),
         budget=float(budget),
         preferences=[p.strip() for p in preferences.split(",") if p.strip()] if preferences else [],
-        departure_city=departure
+        departure_city=departure,
     )
-    
+
+    # 初始状态
+    progress(0.02, "需求分析完成，准备调度")
+    yield (
+        "",
+        "[🎯调度] 需求分析完成，准备调度 6 个子任务\n",
+        _get_default_status(),
+        None,
+        gr.update(visible=False),
+    )
+
     try:
-        result = await run_travel_planner(request)
-        
-        logs = "\n".join([f"[{log['step']}] {log['message']}" for log in result.get("agent_logs", [])])
-        final_plan = result.get("final_plan", "规划失败")
-        
-        agent_status = f"天气: {'✅' if result.get('weather_result') else '❌'}\n"
-        agent_status += f"交通: {'✅' if result.get('transport_result') else '❌'}\n"
-        agent_status += f"住宿: {'✅' if result.get('hotel_result') else '❌'}\n"
-        agent_status += f"行程: {'✅' if result.get('itinerary_result') else '❌'}\n"
-        agent_status += f"预算: {'✅' if result.get('budget_result') else '❌'}\n"
-        agent_status += f"超预算调整: {'⚠️已调整' if result.get('budget_adjusted') else '—'}"
-        
-        return final_plan, logs, agent_status, result
+        async for state in run_travel_planner_stream(request, progress=progress):
+            logs = "\n".join(
+                f"[{log['step']}] {log['message']}"
+                for log in state.get("agent_logs", [])
+            )
+            final_plan = state.get("final_plan", "")
+            status = _format_agent_status(state)
+
+            # 方案生成完毕后创建下载文件
+            download_update = gr.update(visible=False)
+            if state.get("final_plan"):
+                try:
+                    tmp = tempfile.NamedTemporaryFile(
+                        mode="w", suffix=".md", delete=False, encoding="utf-8"
+                    )
+                    tmp.write(state["final_plan"])
+                    tmp.close()
+                    download_update = gr.update(value=tmp.name, visible=True)
+                except Exception:
+                    pass
+
+            yield final_plan, logs, status, state, download_update
     except Exception as e:
-        return f"规划失败: {str(e)}", "", "", None
+        yield f"规划失败: {str(e)}", "", _get_default_status(), None, gr.update(visible=False)
 
 
 async def handle_adjustment(instruction, previous_state):
     """处理用户调整指令，重新运行受影响 Agent。"""
     if not instruction or not previous_state:
-        return "请输入调整指令", "", "", None
-    
+        return "请输入调整指令", "", _get_default_status(), None, gr.update(visible=False)
+
     try:
         result = await adjust_plan(previous_state, instruction)
-        
-        logs = "\n".join([f"[{log['step']}] {log['message']}" for log in result.get("agent_logs", [])])
+
+        logs = "\n".join(
+            f"[{log['step']}] {log['message']}"
+            for log in result.get("agent_logs", [])
+        )
         final_plan = result.get("final_plan", "调整失败")
-        
-        agent_status = f"天气: {'✅' if result.get('weather_result') else '❌'}\n"
-        agent_status += f"交通: {'✅' if result.get('transport_result') else '❌'}\n"
-        agent_status += f"住宿: {'✅' if result.get('hotel_result') else '❌'}\n"
-        agent_status += f"行程: {'✅' if result.get('itinerary_result') else '❌'}\n"
-        agent_status += f"预算: {'✅' if result.get('budget_result') else '❌'}\n"
-        agent_status += f"超预算调整: {'⚠️已调整' if result.get('budget_adjusted') else '—'}"
-        
-        return final_plan, logs, agent_status, result
+        status = _format_agent_status(result)
+
+        # 创建下载文件
+        download_update = gr.update(visible=False)
+        if result.get("final_plan"):
+            try:
+                tmp = tempfile.NamedTemporaryFile(
+                    mode="w", suffix=".md", delete=False, encoding="utf-8"
+                )
+                tmp.write(result["final_plan"])
+                tmp.close()
+                download_update = gr.update(value=tmp.name, visible=True)
+            except Exception:
+                pass
+
+        return final_plan, logs, status, result, download_update
     except Exception as e:
-        return f"调整失败: {str(e)}", "", "", None
+        return f"调整失败: {str(e)}", "", _get_default_status(), None, gr.update(visible=False)
 
 
 async def chat(message, history):
@@ -221,7 +281,13 @@ with gr.Blocks(title="TripMind - 多Agent旅行规划") as app:
                     gr.Markdown("### 📨 Agent 通信日志")
                     agent_logs = gr.Textbox(label="日志", interactive=False, lines=8)
 
-            gr.Markdown("### 📄 旅行方案")
+            with gr.Row():
+                with gr.Column(scale=1):
+                    gr.Markdown("### 📄 旅行方案")
+                with gr.Column(scale=1, min_width=160):
+                    download_btn = gr.DownloadButton(
+                        "📥 下载方案", variant="secondary", visible=False,
+                    )
             final_plan = gr.Markdown()
 
             # ── 追问调整区域 ──
@@ -235,18 +301,18 @@ with gr.Blocks(title="TripMind - 多Agent旅行规划") as app:
                     )
                     adjust_btn = gr.Button("📋 应用调整", variant="secondary", scale=1)
 
-            # 规划按钮
+            # 规划按钮 — 流式输出（5 个输出组件）
             plan_btn.click(
                 plan_travel,
                 [destination, days, budget, departure, preferences],
-                [final_plan, agent_logs, agent_status, plan_state]
+                [final_plan, agent_logs, agent_status, plan_state, download_btn],
             )
 
             # 调整按钮
             adjust_btn.click(
                 handle_adjustment,
                 [adjustment_input, plan_state],
-                [final_plan, agent_logs, agent_status, plan_state]
+                [final_plan, agent_logs, agent_status, plan_state, download_btn],
             )
 
         with gr.Tab("对话"):

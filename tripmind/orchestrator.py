@@ -2,43 +2,20 @@
 
 使用 BaseAgent 实例，通过 MCP 协议调用工具，
 支持自动回退到直接 tools.py 调用。
+支持 astream 实时进度流，用于前端渐进更新。
 """
 
 import re
-from typing import TypedDict
 from langgraph.graph import StateGraph, START, END
 import asyncio
 
+from tripmind.types import TravelRequest, TravelState
 from tripmind.agents.transport import transport_agent
 from tripmind.agents.hotel import hotel_agent
 from tripmind.agents.weather import weather_agent
 from tripmind.agents.itinerary import itinerary_agent
 from tripmind.agents.budget import budget_agent
 from tripmind.agents.summarizer import summarizer_agent
-
-
-class TravelRequest(TypedDict):
-    """用户旅行需求"""
-    destination: str
-    days: int
-    budget: float
-    preferences: list[str]
-    departure_city: str
-
-
-class TravelState(TypedDict):
-    """Multi-Agent 协作全局状态"""
-    request: TravelRequest
-    weather_result: dict | None
-    transport_result: dict | None
-    hotel_result: dict | None
-    itinerary_result: dict | None
-    budget_result: dict | None
-    final_plan: str | None
-    agent_logs: list[dict]
-    current_step: str
-    budget_adjusted: bool          # 是否已执行预算调整
-    adjustment_history: list[str]  # 追问调整记录
 
 
 # 所有 Agent 实例
@@ -213,14 +190,9 @@ def build_travel_graph() -> StateGraph:
     return workflow.compile()
 
 
-async def run_travel_planner(request: TravelRequest) -> dict:
-    """运行旅游规划器。
-
-    初始化状态，通过 LangGraph 状态机编排所有 Agent 执行。
-    """
-    graph = build_travel_graph()
-
-    initial_state: TravelState = {
+def _build_initial_state(request: TravelRequest) -> TravelState:
+    """构造 LangGraph 初始状态。"""
+    return {
         "request": request,
         "weather_result": None,
         "transport_result": None,
@@ -234,8 +206,59 @@ async def run_travel_planner(request: TravelRequest) -> dict:
         "adjustment_history": [],
     }
 
-    result = await graph.ainvoke(initial_state)
+
+async def run_travel_planner(request: TravelRequest) -> dict:
+    """运行旅游规划器（一次性返回最终结果）。
+
+    使用 graph.ainvoke 执行完整流程，适合不需要中间进度的场景。
+    """
+    graph = build_travel_graph()
+    result = await graph.ainvoke(_build_initial_state(request))
     return result
+
+
+# ─── 节点名→进度映射 ──────────────────────────────────
+
+_NODE_PROGRESS = {
+    "orchestrator": (0.05, "🎯 调度分析"),
+    "parallel": (0.35, "🌤️✈️🏨 并行获取数据"),
+    "planning": (0.65, "🗺️💰 行程与预算规划"),
+    "budget_adjust": (0.80, "💰 预算调整"),
+    "summarizer": (0.95, "📝 方案汇总生成"),
+}
+
+
+def _report_progress(progress, node_name: str):
+    """向 gr.Progress 回调报告节点进度。"""
+    if progress is None:
+        return
+    pct, desc = _NODE_PROGRESS.get(node_name, (None, ""))
+    if pct is not None:
+        progress(pct, desc)
+
+
+async def run_travel_planner_stream(request: TravelRequest, progress=None):
+    """运行旅游规划器（逐节点流式返回中间状态）。
+
+    使用 graph.astream 替代 ainvoke，每次 yield 一个 Agent 节点的
+    完整 state 快照。配合 Gradio 生成器实现前端实时进度。
+
+    Args:
+        request: 用户旅行需求
+        progress: gr.Progress() 实例（可选），自动更新进度条
+
+    Yields:
+        每个节点完成后的 TravelState 快照
+    """
+    graph = build_travel_graph()
+    initial_state = _build_initial_state(request)
+
+    async for step in graph.astream(initial_state):
+        # step 格式: {node_name: node_output_dict}
+        for node_name, node_output in step.items():
+            if isinstance(node_output, dict):
+                _report_progress(progress, node_name)
+                yield node_output
 
 
 # ─── 追问调整（UC-05）───────────────────────────────────
