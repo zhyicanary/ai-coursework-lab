@@ -1,0 +1,66 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "last_run": "2026-06-21T07:55:05.026Z",
+    "root": "/home/zzy/git/zyd_homework/ai-coursework-lab",
+    "include_patterns": [
+      "**/*.py",
+      "pyproject.toml",
+      ".env.example",
+      "Makefile",
+      "README.md"
+    ],
+    "exclude_patterns": [
+      "**/__pycache__/**",
+      "**/*.pyc",
+      ".venv/**",
+      "design/**",
+      "data/**",
+      ".claude/**",
+      ".mimocode/**",
+      ".trae/**",
+      "uv.lock",
+      "self-check-log.md"
+    ],
+    "exceptions": []
+  },
+  "file_hashes": {
+    ".env.example": "6dbdfded6b57b13367bc7adde51dac23",
+    "Makefile": "f6a1f60e8eb029bc34430cd6339e385a",
+    "README.md": "2e8fda0960d2850abef402a48a1e1fe6",
+    "common/__init__.py": "d41d8cd98f00b204e9800998ecf8427e",
+    "common/embedding_client.py": "dbf1217b516ad74833273daa04b3f3e8",
+    "common/llm_client.py": "c80b38bc6856c7ade3f53d1aed1a7862",
+    "common/mcp_server/__init__.py": "d41d8cd98f00b204e9800998ecf8427e",
+    "common/mcp_server/client.py": "5e01a36612ae446604018e00110be624",
+    "common/mcp_server/init_attractions.py": "e7d88ea6391aa8bdfc56116f68625b5f",
+    "common/mcp_server/server.py": "8f163c40f4760ad2b6f085e79e912f0a",
+    "common/mcp_server/tools.py": "9e15449567eff01477f175091b99cadd",
+    "common/vector_store.py": "bf1443c8050911427d5b5d7ae816add0",
+    "knowseeker/README.md": "c081967df4544a48f9c0825fd54850b8",
+    "knowseeker/__init__.py": "d41d8cd98f00b204e9800998ecf8427e",
+    "pyproject.toml": "b92d7265fea00290e9be5923f1a4b356",
+    "tripmind/README.md": "aacf9826dae6ca4620f56a05930f6143",
+    "tripmind/__init__.py": "d41d8cd98f00b204e9800998ecf8427e",
+    "tripmind/agents/__init__.py": "dc78844b3c43028b16270c823651443c",
+    "tripmind/agents/base.py": "2901fbc00690ef09269ffef59cc1aaca",
+    "tripmind/agents/budget.py": "4968f8da06aaa5662169fb539b528490",
+    "tripmind/agents/hotel.py": "fb69508d67bca78b97817bac61dccfb8",
+    "tripmind/agents/itinerary.py": "a46d6684b1837b1407d14cf07fe2c9fc",
+    "tripmind/agents/summarizer.py": "30cca22570964192a16ffe3fabb7b6b4",
+    "tripmind/agents/transport.py": "823d3769ae58112dbe3c05d5a1661741",
+    "tripmind/agents/weather.py": "fa15f792cc34093ddae595f850d1a9b5",
+    "tripmind/app.py": "a33c98ec38efe3fd801663171fd739a9",
+    "tripmind/orchestrator.py": "4d56b63d4007602327c2ee2cd71128d7",
+    "tripmind/prompts.py": "285cab5e5b74bbe9620ade53ff74e671",
+    "tripmind/types.py": "7b21e7941efeee7720ca4088c843eebd"
+  },
+  "folder_hashes": {
+    ".": "afc5c9e29e8381b082369ae4d947f814",
+    "common": "2249444aa632389100ad8c1e0215b0d0",
+    "common/mcp_server": "025aab1b0fdc16c730800b93add88ca1",
+    "knowseeker": "36d4cf97e1aba1e67bb4e6c581657d33",
+    "tripmind": "832161a422e407ba545cf26d39b969fd",
+    "tripmind/agents": "280951ce0a55a5fd004f88aa67769026"
+  }
+}
