@@ -15,7 +15,7 @@
 
 - **Python 3.14** + **uv** 包管理
 - **LLM**: DeepSeek API（OpenAI 兼容接口）
-- **Embedding**: Ollama 本地模型（qwen3-embedding:4b）
+- **Embedding**: Ollama 本地模型（qwen3-embedding:8b）
 - **向量库**: ChromaDB
 - **编排**: LangChain + LangGraph
 - **协议**: MCP (Python MCP SDK, FastMCP)

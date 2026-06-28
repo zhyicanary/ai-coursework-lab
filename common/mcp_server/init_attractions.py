@@ -6,7 +6,7 @@
 用法：
   uv run python -m common.mcp_server.init_attractions
 
-注意：需要 Ollama 运行中且已加载 qwen3-embedding:4b 或配置的 Embedding 模型。
+注意：需要 Ollama 运行中且已加载 qwen3-embedding:8b 或配置的 Embedding 模型。
 如果 Embedding 服务不可用，search_attractions 会回退到 JSON 文件直接读取。
 """
 
@@ -26,6 +26,7 @@ def _check_embedding() -> bool:
     """检查 Embedding 服务是否可用。"""
     try:
         from common.embedding_client import embedding
+
         embedding.embed_texts(["测试"])
         return True
     except Exception as e:

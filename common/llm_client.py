@@ -1,7 +1,8 @@
 import os
 from pathlib import Path
-from openai import AsyncOpenAI
+
 from dotenv import load_dotenv, set_key
+from openai import AsyncOpenAI
 
 # 项目根目录的 .env 文件路径
 ENV_FILE = Path(__file__).parent.parent / ".env"
@@ -23,13 +24,13 @@ class LLMClient:
     def _refresh(self):
         """根据当前属性重新创建 client，并从 .env 读取最新配置。"""
         load_dotenv(override=True)
-        
+
         if self.backend == "ollama":
             self.base_url = self.base_url or os.getenv(
                 "OLLAMA_BASE_URL", "http://localhost:11434/v1"
             )
             self.api_key = "ollama"
-            self.model = self.model or os.getenv("OLLAMA_MODEL", "qwen3.5:4b")
+            self.model = self.model or os.getenv("OLLAMA_MODEL", "gemma4:latest")
         else:
             self.base_url = self.base_url or os.getenv(
                 "DEEPSEEK_BASE_URL", "https://api.deepseek.com"
@@ -39,7 +40,7 @@ class LLMClient:
 
         if not self.api_key:
             self.api_key = "sk-placeholder"
-            
+
         self.client = AsyncOpenAI(api_key=self.api_key, base_url=self.base_url)
 
     def update(

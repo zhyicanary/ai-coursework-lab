@@ -1,10 +1,10 @@
-import sys
-import subprocess
-import tempfile
 import asyncio
+import subprocess
+import sys
+import tempfile
 import warnings
-from pathlib import Path
 from functools import lru_cache
+from pathlib import Path
 
 # 过滤 Gradio 依赖中的 Starlette 弃用警告（Gradio 尚未适配 Starlette 新常量名）
 warnings.filterwarnings("ignore", message=".*HTTP_422_UNPROCESSABLE_ENTITY.*")
@@ -13,9 +13,14 @@ warnings.filterwarnings("ignore", message=".*HTTP_422_UNPROCESSABLE_ENTITY.*")
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import gradio as gr
+
 from common.llm_client import llm
+from tripmind.orchestrator import (
+    adjust_plan,
+    run_travel_planner,
+    run_travel_planner_stream,
+)
 from tripmind.types import TravelRequest
-from tripmind.orchestrator import run_travel_planner, run_travel_planner_stream, adjust_plan
 
 
 def update_settings(backend, model, api_key, base_url):
@@ -30,21 +35,24 @@ def update_settings(backend, model, api_key, base_url):
 def fetch_deepseek_models():
     """从 DeepSeek 官网获取模型列表，失败时返回默认列表"""
     try:
+        import os
+
         import httpx
         from dotenv import load_dotenv
-        import os
-        
+
         load_dotenv()
         api_key = os.getenv("DEEPSEEK_API_KEY", "")
-        
+
         if api_key:
             headers = {"Authorization": f"Bearer {api_key}"}
-            resp = httpx.get("https://api.deepseek.com/models", headers=headers, timeout=5)
+            resp = httpx.get(
+                "https://api.deepseek.com/models", headers=headers, timeout=5
+            )
             if resp.status_code == 200:
                 models = [m["id"] for m in resp.json().get("data", [])]
                 if models:
                     return models
-        
+
         return ["deepseek-chat", "deepseek-reasoner", "deepseek-coder"]
     except Exception:
         return ["deepseek-chat", "deepseek-reasoner", "deepseek-coder"]
@@ -53,17 +61,19 @@ def fetch_deepseek_models():
 def fetch_ollama_models():
     """从本地 Ollama 获取模型列表"""
     try:
-        result = subprocess.run(["ollama", "list"], capture_output=True, text=True, timeout=5)
+        result = subprocess.run(
+            ["ollama", "list"], capture_output=True, text=True, timeout=5
+        )
         if result.returncode == 0:
             models = []
             for line in result.stdout.strip().split("\n")[1:]:
                 name = line.split()[0] if line.strip() else None
                 if name:
                     models.append(name)
-            return models if models else ["qwen3.5:4b"]
-        return ["qwen3.5:4b"]
+            return models if models else ["gemma4:latest"]
+        return ["gemma4:latest"]
     except Exception:
-        return ["qwen3.5:4b"]
+        return ["gemma4:latest"]
 
 
 def _ensure_model_in_list(models: list[str], saved_model: str) -> list[str]:
@@ -81,9 +91,11 @@ def on_backend_change(backend):
     cfg = llm.get_config()
     if backend == "ollama":
         saved = cfg["model"] if cfg["backend"] == "ollama" else None
-        default_model = saved or "qwen3.5:4b"
+        default_model = saved or "gemma4:latest"
         return (
-            gr.update(value=default_model, choices=[default_model], allow_custom_value=True),
+            gr.update(
+                value=default_model, choices=[default_model], allow_custom_value=True
+            ),
             gr.update(value="", visible=False),
             gr.update(value="http://localhost:11434/v1", visible=True),
         )
@@ -91,7 +103,9 @@ def on_backend_change(backend):
         saved = cfg["model"] if cfg["backend"] == "deepseek" else None
         default_model = saved or "deepseek-chat"
         return (
-            gr.update(value=default_model, choices=[default_model], allow_custom_value=True),
+            gr.update(
+                value=default_model, choices=[default_model], allow_custom_value=True
+            ),
             gr.update(value="", visible=True),
             gr.update(value="https://api.deepseek.com", visible=True),
         )
@@ -116,7 +130,11 @@ def get_config():
     is_ollama = cfg["backend"] == "ollama"
     # 只显示已保存的模型，不联网拉取
     saved_model = cfg["model"]
-    choices = [saved_model] if saved_model else (["deepseek-chat"] if not is_ollama else ["qwen3.5:4b"])
+    choices = (
+        [saved_model]
+        if saved_model
+        else (["deepseek-chat"] if not is_ollama else ["gemma4:latest"])
+    )
     return (
         cfg["backend"],
         gr.update(value=saved_model, choices=choices, allow_custom_value=True),
@@ -154,18 +172,28 @@ def _get_default_status() -> str:
     return "\n".join(f"{a}: ⏳ 等待" for a in agents) + "\n💡 调整: —"
 
 
-async def plan_travel(destination, days, budget, departure, preferences, progress=gr.Progress()):
+async def plan_travel(
+    destination, days, budget, departure, preferences, progress=gr.Progress()
+):
     """运行多 Agent 旅游规划（流式输出，逐节点更新 UI）。"""
     if not destination or not days or not budget or not departure:
         gr.Warning("请填写所有必填字段")
-        yield "请填写所有必填字段", "", _get_default_status(), None, gr.update(visible=False)
+        yield (
+            "请填写所有必填字段",
+            "",
+            _get_default_status(),
+            None,
+            gr.update(visible=False),
+        )
         return
 
     request = TravelRequest(
         destination=destination,
         days=int(days),
         budget=float(budget),
-        preferences=[p.strip() for p in preferences.split(",") if p.strip()] if preferences else [],
+        preferences=[p.strip() for p in preferences.split(",") if p.strip()]
+        if preferences
+        else [],
         departure_city=departure,
     )
 
@@ -203,20 +231,31 @@ async def plan_travel(destination, days, budget, departure, preferences, progres
 
             yield final_plan, logs, status, state, download_update
     except Exception as e:
-        yield f"规划失败: {str(e)}", "", _get_default_status(), None, gr.update(visible=False)
+        yield (
+            f"规划失败: {str(e)}",
+            "",
+            _get_default_status(),
+            None,
+            gr.update(visible=False),
+        )
 
 
 async def handle_adjustment(instruction, previous_state):
     """处理用户调整指令，重新运行受影响 Agent。"""
     if not instruction or not previous_state:
-        return "请输入调整指令", "", _get_default_status(), None, gr.update(visible=False)
+        return (
+            "请输入调整指令",
+            "",
+            _get_default_status(),
+            None,
+            gr.update(visible=False),
+        )
 
     try:
         result = await adjust_plan(previous_state, instruction)
 
         logs = "\n".join(
-            f"[{log['step']}] {log['message']}"
-            for log in result.get("agent_logs", [])
+            f"[{log['step']}] {log['message']}" for log in result.get("agent_logs", [])
         )
         final_plan = result.get("final_plan", "调整失败")
         status = _format_agent_status(result)
@@ -236,7 +275,13 @@ async def handle_adjustment(instruction, previous_state):
 
         return final_plan, logs, status, result, download_update
     except Exception as e:
-        return f"调整失败: {str(e)}", "", _get_default_status(), None, gr.update(visible=False)
+        return (
+            f"调整失败: {str(e)}",
+            "",
+            _get_default_status(),
+            None,
+            gr.update(visible=False),
+        )
 
 
 async def chat(message, history):
@@ -266,7 +311,9 @@ with gr.Blocks(title="TripMind - 多Agent旅行规划") as app:
                 budget = gr.Number(label="预算(元)", value=3000, minimum=100)
             with gr.Row():
                 departure = gr.Textbox(label="出发地", placeholder="北京")
-                preferences = gr.Textbox(label="偏好(逗号分隔)", placeholder="美食,历史文化")
+                preferences = gr.Textbox(
+                    label="偏好(逗号分隔)", placeholder="美食,历史文化"
+                )
 
             plan_btn = gr.Button("🚀 开始规划", variant="primary")
 
@@ -286,7 +333,9 @@ with gr.Blocks(title="TripMind - 多Agent旅行规划") as app:
                     gr.Markdown("### 📄 旅行方案")
                 with gr.Column(scale=1, min_width=160):
                     download_btn = gr.DownloadButton(
-                        "📥 下载方案", variant="secondary", visible=False,
+                        "📥 下载方案",
+                        variant="secondary",
+                        visible=False,
                     )
             final_plan = gr.Markdown()
 
@@ -318,9 +367,7 @@ with gr.Blocks(title="TripMind - 多Agent旅行规划") as app:
         with gr.Tab("对话"):
             chatbot = gr.Chatbot()
             msg = gr.Textbox(placeholder="输入你的旅行需求...", label="消息")
-            msg.submit(chat, [msg, chatbot], [chatbot]).then(
-                lambda: "", None, msg
-            )
+            msg.submit(chat, [msg, chatbot], [chatbot]).then(lambda: "", None, msg)
 
         with gr.Tab("设置"):
             gr.Markdown("### LLM 配置")
@@ -329,8 +376,15 @@ with gr.Blocks(title="TripMind - 多Agent旅行规划") as app:
                     ["deepseek", "ollama"], label="后端", value="deepseek"
                 )
             with gr.Row():
-                model = gr.Dropdown(label="模型", value="deepseek-chat", choices=[], allow_custom_value=True)
-                api_key = gr.Textbox(label="API Key", type="password", value="", visible=True)
+                model = gr.Dropdown(
+                    label="模型",
+                    value="deepseek-chat",
+                    choices=[],
+                    allow_custom_value=True,
+                )
+                api_key = gr.Textbox(
+                    label="API Key", type="password", value="", visible=True
+                )
             with gr.Row():
                 base_url = gr.Textbox(
                     label="Base URL", value="https://api.deepseek.com"
@@ -358,7 +412,9 @@ with gr.Blocks(title="TripMind - 多Agent旅行规划") as app:
 
             # 页面加载时回显当前配置，然后后台拉取模型列表
             app.load(
-                get_config, None, [backend, model, api_key, base_url, status],
+                get_config,
+                None,
+                [backend, model, api_key, base_url, status],
                 show_progress="hidden",
             ).then(
                 refresh_model_list,

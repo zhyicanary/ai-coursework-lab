@@ -22,8 +22,8 @@ import tempfile
 import streamlit as st
 
 from common.document_loader import list_supported_extensions
-from knowseeker.rag_chain import index_document, list_documents, delete_document
-from knowseeker.agent import run_rag_query
+from knowseeker.agent import AgentState, run_rag_query
+from knowseeker.rag_chain import delete_document, index_document, list_documents
 
 # ── 页面配置 ─────────────────────────────────────────────
 
@@ -42,6 +42,9 @@ if "messages" not in st.session_state:
 if "thinking_expanded" not in st.session_state:
     st.session_state.thinking_expanded = True
 
+if "uploader_key" not in st.session_state:
+    st.session_state.uploader_key = 0
+
 
 # ── 辅助函数 ─────────────────────────────────────────────
 
@@ -55,7 +58,7 @@ def refresh_doc_list():
         st.warning(f"获取文档列表失败：{e}")
 
 
-def run_agent_sync(question: str) -> dict:
+def run_agent_sync(question: str) -> AgentState:
     """同步包装异步 agent 调用。"""
     return asyncio.run(run_rag_query(question))
 
@@ -66,11 +69,12 @@ with st.sidebar:
     st.title("📁 文档管理")
     st.caption("上传文档后即可提问")
 
-    # 上传区域
+    # 上传区域（key 递增确保上传后重置，避免重执行时重复入库）
     uploaded_file = st.file_uploader(
         "上传文档",
         type=list_supported_extensions(),
         help=f"支持格式：{', '.join(list_supported_extensions())}",
+        key=f"uploader_{st.session_state.uploader_key}",
     )
 
     if uploaded_file is not None:
@@ -85,12 +89,19 @@ with st.sidebar:
                 result = index_document(tmp_path, filename=uploaded_file.name)
                 os.unlink(tmp_path)  # 清理临时文件
 
-                st.success(f"✅ 入库完成：{result['file_name']}（{result['chunks_count']} 个片段）")
+                st.success(
+                    f"✅ 入库完成：{result['file_name']}（{result['chunks_count']} 个片段）"
+                )
                 refresh_doc_list()
+                # 递增 key 重置上传器，防止后续 rerun 重复入库
+                st.session_state.uploader_key += 1
+                st.rerun()
             except Exception as e:
                 err_msg = str(e)
                 if "Connection error" in err_msg or "Connection refused" in err_msg:
-                    st.error("❌ Ollama 服务未运行，无法完成向量化。请先启动：`ollama serve`")
+                    st.error(
+                        "❌ Ollama 服务未运行，无法完成向量化。请先启动：`ollama serve`"
+                    )
                 else:
                     st.error(f"❌ 索引失败：{err_msg}")
 
@@ -143,9 +154,21 @@ for msg in st.session_state.messages:
 
         # Agent 消息显示思维链
         if msg["role"] == "assistant" and msg.get("thinking_trace"):
-            with st.expander("🧠 思考过程", expanded=st.session_state.thinking_expanded):
+            with st.expander(
+                "🧠 思考过程", expanded=st.session_state.thinking_expanded
+            ):
                 for step in msg["thinking_trace"]:
-                    icon = "📋" if step["step"] == "analyze" else "🔍" if step["step"] == "retrieve" else "📊" if step["step"] == "evaluate" else "🔄" if step["step"] == "reformulate" else "📝"
+                    icon = (
+                        "📋"
+                        if step["step"] == "analyze"
+                        else "🔍"
+                        if step["step"] == "retrieve"
+                        else "📊"
+                        if step["step"] == "evaluate"
+                        else "🔄"
+                        if step["step"] == "reformulate"
+                        else "📝"
+                    )
                     st.markdown(f"**{icon} {step['content']}**")
                     if step.get("detail"):
                         st.caption(step["detail"])
@@ -173,12 +196,14 @@ if prompt := st.chat_input("请输入您的问题..."):
     if not doc_list:
         with st.chat_message("assistant"):
             st.warning("⚠️ 知识库为空，请先在左侧上传文档后再提问。")
-        st.session_state.messages.append({
-            "role": "assistant",
-            "content": "⚠️ 知识库为空，请先在左侧上传文档后再提问。",
-            "thinking_trace": [],
-            "citations": [],
-        })
+        st.session_state.messages.append(
+            {
+                "role": "assistant",
+                "content": "⚠️ 知识库为空，请先在左侧上传文档后再提问。",
+                "thinking_trace": [],
+                "citations": [],
+            }
+        )
     else:
         # Agent 处理
         with st.chat_message("assistant"):
@@ -216,12 +241,14 @@ if prompt := st.chat_input("请输入您的问题..."):
                                 st.code(f"来源：{c['doc_name']}")
 
                     # 存入历史
-                    st.session_state.messages.append({
-                        "role": "assistant",
-                        "content": answer,
-                        "thinking_trace": thinking_trace,
-                        "citations": citations,
-                    })
+                    st.session_state.messages.append(
+                        {
+                            "role": "assistant",
+                            "content": answer,
+                            "thinking_trace": thinking_trace,
+                            "citations": citations,
+                        }
+                    )
 
                 except Exception as e:
                     err_msg = str(e)
@@ -230,9 +257,11 @@ if prompt := st.chat_input("请输入您的问题..."):
                     else:
                         hint = err_msg
                     st.error(f"❌ Agent 执行异常：{hint}")
-                    st.session_state.messages.append({
-                        "role": "assistant",
-                        "content": f"❌ 处理问题时出现异常：{hint}",
-                        "thinking_trace": [],
-                        "citations": [],
-                    })
+                    st.session_state.messages.append(
+                        {
+                            "role": "assistant",
+                            "content": f"❌ 处理问题时出现异常：{hint}",
+                            "thinking_trace": [],
+                            "citations": [],
+                        }
+                    )

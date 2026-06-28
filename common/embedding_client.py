@@ -1,6 +1,7 @@
 import os
-from openai import OpenAI
+
 from dotenv import load_dotenv
+from openai import OpenAI
 
 load_dotenv()
 
@@ -9,10 +10,8 @@ class EmbeddingClient:
     """Embedding 客户端，支持 Ollama 本地模型。"""
 
     def __init__(self):
-        self.model: str = os.getenv("EMBEDDING_MODEL", "qwen3-embedding:4b")
-        self.base_url: str = os.getenv(
-            "OLLAMA_BASE_URL", "http://localhost:11434/v1"
-        )
+        self.model: str = os.getenv("EMBEDDING_MODEL", "qwen3-embedding:8b")
+        self.base_url: str = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1")
         self.client = OpenAI(api_key="ollama", base_url=self.base_url)
 
     def embed_texts(self, texts: list[str]) -> list[list[float]]:

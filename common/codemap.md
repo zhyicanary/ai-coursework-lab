@@ -2,7 +2,7 @@
 
 ## 职责
 
-`common/` 是 KnowSeeker（单智能体 RAG 问答）和 TripMind（多智能体旅行规划器）的共享基础设施层。它提供三个以**全局单例**形式暴露的核心能力：一个可在运行时在 DeepSeek API 和本地 Ollama 之间热切换的 LLM 客户端（`LLMClient` / `llm`），一个由 Ollama 的 `qwen3-embedding:4b` 驱动的本地嵌入客户端（`EmbeddingClient` / `embedding`），以及一个带有模块级函数、支持两个独立集合命名空间（`"attractions"` 和 `"documents"`）的 ChromaDB 向量存储。此外，它还包含完整的 **MCP 协议层**——一个注册了 5 个旅行工具（航班、火车、酒店、天气、景点）的 FastMCP 服务器、一个可从 MCP stdio 无缝回退到直接函数调用的双路径客户端，以及涵盖 6 个中国城市的所有模拟 JSON 数据。
+`common/` 是 KnowSeeker（单智能体 RAG 问答）和 TripMind（多智能体旅行规划器）的共享基础设施层。它提供三个以**全局单例**形式暴露的核心能力：一个可在运行时在 DeepSeek API 和本地 Ollama 之间热切换的 LLM 客户端（`LLMClient` / `llm`），一个由 Ollama 的 `qwen3-embedding:8b` 驱动的本地嵌入客户端（`EmbeddingClient` / `embedding`），以及一个带有模块级函数、支持两个独立集合命名空间（`"attractions"` 和 `"documents"`）的 ChromaDB 向量存储。此外，它还包含完整的 **MCP 协议层**——一个注册了 5 个旅行工具（航班、火车、酒店、天气、景点）的 FastMCP 服务器、一个可从 MCP stdio 无缝回退到直接函数调用的双路径客户端，以及涵盖 6 个中国城市的所有模拟 JSON 数据。
 
 ## 文件说明
 
