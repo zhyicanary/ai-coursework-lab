@@ -28,7 +28,8 @@ def update_settings(backend, model, api_key, base_url):
         gr.Warning("DeepSeek 后端必须填写 API Key")
         return "请填写 API Key"
     llm.update(backend=backend, model=model, api_key=api_key, base_url=base_url)
-    return f"已切换到 {backend} / {model}"
+    gr.Info(f"✅ 配置已保存 — {backend} / {model}")
+    return f"当前: {backend} / {model}"
 
 
 @lru_cache(maxsize=1)
@@ -145,31 +146,98 @@ def get_config():
 
 
 def _format_agent_status(state: dict) -> str:
-    """将 state 中的 Agent 结果格式化为状态面板文本。"""
+    """将 state 中的 Agent 结果格式化为漂亮的 HTML 状态面板。"""
     agents = [
-        ("🌤️ 天气", "weather_result"),
-        ("✈️ 交通", "transport_result"),
-        ("🏨 住宿", "hotel_result"),
-        ("🗺️ 行程", "itinerary_result"),
-        ("💰 预算", "budget_result"),
+        ("🌤️", "天气", "weather_result"),
+        ("✈️", "交通", "transport_result"),
+        ("🏨", "住宿", "hotel_result"),
+        ("🗺️", "行程", "itinerary_result"),
+        ("💰", "预算", "budget_result"),
     ]
-    lines = []
-    for label, key in agents:
+    items = []
+    for icon, label, key in agents:
         val = state.get(key)
         if val is None:
-            lines.append(f"{label}: ⏳ 等待")
+            cls, badge = "waiting", "⏳"
         elif val.get("error"):
-            lines.append(f"{label}: ❌ 失败")
+            cls, badge = "error", "❌"
         else:
-            lines.append(f"{label}: ✅ 完成")
-    lines.append(f"💡 调整: {'⚠️ 已调整' if state.get('budget_adjusted') else '—'}")
-    return "\n".join(lines)
+            cls, badge = "done", "✅"
+        items.append(
+            f'<div class="agent-item {cls}">'
+            f'<span class="agent-icon">{icon}</span>'
+            f'<span class="agent-name">{label}</span>'
+            f'<span class="agent-badge">{badge}</span>'
+            f"</div>"
+        )
+
+    # 调整指示器
+    adjusted = state.get("budget_adjusted", False)
+    adj_cls = "done" if adjusted else "waiting"
+    adj_badge = "⚠️ 已调整" if adjusted else "—"
+    items.append(
+        f'<div class="agent-item {adj_cls}">'
+        f'<span class="agent-icon">💡</span>'
+        f'<span class="agent-name">调整</span>'
+        f'<span class="agent-badge">{adj_badge}</span>'
+        f"</div>"
+    )
+
+    return f'<div class="agent-status-grid">{"".join(items)}</div>'
 
 
 def _get_default_status() -> str:
-    """初始状态面板文本。"""
-    agents = ["🌤️ 天气", "✈️ 交通", "🏨 住宿", "🗺️ 行程", "💰 预算"]
-    return "\n".join(f"{a}: ⏳ 等待" for a in agents) + "\n💡 调整: —"
+    """初始状态面板 HTML — 所有 Agent 等待中。"""
+    agents = [
+        ("🌤️", "天气"),
+        ("✈️", "交通"),
+        ("🏨", "住宿"),
+        ("🗺️", "行程"),
+        ("💰", "预算"),
+        ("💡", "调整"),
+    ]
+    items = "".join(
+        f'<div class="agent-item waiting">'
+        f'<span class="agent-icon">{icon}</span>'
+        f'<span class="agent-name">{label}</span>'
+        f'<span class="agent-badge">⏳</span>'
+        f"</div>"
+        for icon, label in agents
+    )
+    return f'<div class="agent-status-grid">{items}</div>'
+
+
+def _get_cancelled_status() -> str:
+    """中断状态面板 HTML — 所有 Agent 标记为取消。"""
+    agents = [
+        ("🌤️", "天气"),
+        ("✈️", "交通"),
+        ("🏨", "住宿"),
+        ("🗺️", "行程"),
+        ("💰", "预算"),
+        ("💡", "调整"),
+    ]
+    items = "".join(
+        f'<div class="agent-item cancelled">'
+        f'<span class="agent-icon">{icon}</span>'
+        f'<span class="agent-name">{label}</span>'
+        f'<span class="agent-badge">⏹️</span>'
+        f"</div>"
+        for icon, label in agents
+    )
+    return f'<div class="agent-status-grid">{items}</div>'
+
+
+def handle_cancel():
+    """中断规划时的回调 — 重置 UI 到干净状态。"""
+    return (
+        "❌ **规划已中断** — 你可以修改需求后重新开始。",
+        "⚠️ 用户中断了规划流程\n",
+        _get_cancelled_status(),
+        None,
+        gr.update(visible=False),
+        gr.update(interactive=False),
+    )
 
 
 async def plan_travel(
@@ -184,6 +252,7 @@ async def plan_travel(
             _get_default_status(),
             None,
             gr.update(visible=False),
+            gr.update(interactive=False),
         )
         return
 
@@ -197,7 +266,7 @@ async def plan_travel(
         departure_city=departure,
     )
 
-    # 初始状态
+    # 初始状态：启用停止按钮
     progress(0.02, "需求分析完成，准备调度")
     yield (
         "",
@@ -205,8 +274,10 @@ async def plan_travel(
         _get_default_status(),
         None,
         gr.update(visible=False),
+        gr.update(interactive=True),
     )
 
+    needs_cleanup = True
     try:
         async for state in run_travel_planner_stream(request, progress=progress):
             logs = "\n".join(
@@ -229,7 +300,23 @@ async def plan_travel(
                 except Exception:
                     pass
 
-            yield final_plan, logs, status, state, download_update
+            is_final = bool(state.get("final_plan"))
+            if is_final:
+                needs_cleanup = False
+            yield final_plan, logs, status, state, download_update, gr.update(
+                interactive=not is_final
+            )
+
+        # 流结束后：若未正常完成（无 final_plan），停用停止按钮
+        if needs_cleanup:
+            yield (
+                "",
+                "",
+                _get_default_status(),
+                None,
+                gr.update(visible=False),
+                gr.update(interactive=False),
+            )
     except Exception as e:
         yield (
             f"规划失败: {str(e)}",
@@ -237,6 +324,7 @@ async def plan_travel(
             _get_default_status(),
             None,
             gr.update(visible=False),
+            gr.update(interactive=False),
         )
 
 
@@ -299,129 +387,358 @@ async def chat(message, history):
     return history
 
 
-with gr.Blocks(title="TripMind - 多Agent旅行规划") as app:
-    gr.Markdown("# TripMind - 多Agent协同旅行规划")
+# ─── 自定义 CSS ─────────────────────────────────────────────
+
+CUSTOM_CSS = """
+/* Agent 状态面板：三列响应式网格 */
+.agent-status-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin: 4px 0;
+}
+
+.agent-item {
+    display: flex;
+    align-items: center;
+    padding: 14px 18px;
+    background: var(--background-fill-primary, #ffffff);
+    border: 1px solid var(--border-color-primary, #e5e7eb);
+    border-radius: 12px;
+    gap: 12px;
+    transition: all 0.3s ease;
+    min-height: 48px;
+}
+
+.agent-item.waiting {
+    border-left: 4px solid #d1d5db;
+    opacity: 0.75;
+}
+
+.agent-item.done {
+    border-left: 4px solid #10b981;
+    background: #f0fdf4;
+}
+
+.agent-item.error {
+    border-left: 4px solid #ef4444;
+    background: #fef2f2;
+}
+
+.agent-item.cancelled {
+    border-left: 4px solid #f59e0b;
+    background: #fffbeb;
+    opacity: 0.85;
+}
+
+.agent-icon {
+    font-size: 1.5em;
+    width: 36px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.agent-name {
+    flex: 1;
+    font-weight: 600;
+    font-size: 0.95em;
+    color: #374151;
+}
+
+.agent-badge {
+    font-size: 1.2em;
+    flex-shrink: 0;
+}
+
+/* 日志框：终端风格 */
+.log-box textarea {
+    font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Courier New', monospace !important;
+    font-size: 13px !important;
+    line-height: 1.6 !important;
+    background: #1e293b !important;
+    color: #e2e8f0 !important;
+    border-radius: 8px !important;
+    padding: 12px !important;
+    resize: vertical !important;
+}
+
+/* Chatbot 气泡美化 */
+.chat-container {
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+/* 表单卡片区域 */
+.form-section {
+    margin-bottom: 4px;
+}
+
+/* 方案输出区域 */
+.plan-output {
+    min-height: 120px;
+}
+
+/* 更好的按钮间距 */
+.action-row {
+    gap: 12px;
+}
+
+/* 针对小屏幕的适应 */
+@media (max-width: 768px) {
+    .agent-status-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+@media (max-width: 480px) {
+    .agent-status-grid {
+        grid-template-columns: 1fr;
+    }
+}
+"""
+
+# ─── UI ─────────────────────────────────────────────────────
+
+with gr.Blocks(
+    title="TripMind - 多Agent旅行规划",
+) as app:
+    # ── 页头 ──
+    with gr.Row():
+        gr.Markdown(
+            "# 🧠 TripMind — 多Agent协同旅行规划\n"
+            "*智能旅行规划系统 · 多智能体协作 · AI 驱动*"
+        )
 
     with gr.Tabs():
-        with gr.Tab("旅行规划"):
-            gr.Markdown("### 📝 告诉我你的旅行需求")
-            with gr.Row():
-                destination = gr.Textbox(label="目的地", placeholder="成都")
-                days = gr.Number(label="天数", value=3, minimum=1, maximum=30)
-                budget = gr.Number(label="预算(元)", value=3000, minimum=100)
-            with gr.Row():
-                departure = gr.Textbox(label="出发地", placeholder="北京")
-                preferences = gr.Textbox(
-                    label="偏好(逗号分隔)", placeholder="美食,历史文化"
-                )
+        # ════════════════════════════════════════════════════
+        # Tab 1: 旅行规划
+        # ════════════════════════════════════════════════════
+        with gr.Tab("🗺️ 旅行规划"):
+            # ── 输入表单 ──
+            with gr.Group():
+                gr.Markdown("### 📝 旅行需求")
+                with gr.Row():
+                    destination = gr.Textbox(
+                        label="目的地",
+                        placeholder="成都",
+                        elem_classes="form-section",
+                    )
+                    days = gr.Number(
+                        label="天数",
+                        value=3,
+                        minimum=1,
+                        maximum=30,
+                        elem_classes="form-section",
+                    )
+                    budget = gr.Number(
+                        label="预算 (元)",
+                        value=3000,
+                        minimum=100,
+                        elem_classes="form-section",
+                    )
+                with gr.Row():
+                    departure = gr.Textbox(
+                        label="出发地",
+                        placeholder="北京",
+                        elem_classes="form-section",
+                    )
+                    preferences = gr.Textbox(
+                        label="偏好 (逗号分隔)",
+                        placeholder="美食, 历史文化, 自然风光",
+                        elem_classes="form-section",
+                    )
 
-            plan_btn = gr.Button("🚀 开始规划", variant="primary")
+            # ── 操作按钮 ──
+            with gr.Row(elem_classes="action-row"):
+                plan_btn = gr.Button(
+                    "🚀 开始规划",
+                    variant="primary",
+                    scale=3,
+                    elem_classes="action-row",
+                )
+                stop_btn = gr.Button(
+                    "⏹️ 停止",
+                    variant="stop",
+                    scale=1,
+                    min_width=100,
+                    interactive=False,
+                )
 
             # 存储上一次规划的状态（供调整使用）
             plan_state = gr.State()
 
-            with gr.Row():
-                with gr.Column():
-                    gr.Markdown("### 📊 Agent 执行状态")
-                    agent_status = gr.Textbox(label="状态", interactive=False)
-                with gr.Column():
-                    gr.Markdown("### 📨 Agent 通信日志")
-                    agent_logs = gr.Textbox(label="日志", interactive=False, lines=8)
+            # ── Agent 状态面板 ──
+            gr.Markdown("### 🤖 Agent 执行状态")
+            agent_status = gr.HTML(value=_get_default_status())
 
-            with gr.Row():
-                with gr.Column(scale=1):
+            # ── Agent 通信日志（可折叠）──
+            with gr.Accordion("📨 Agent 通信日志", open=False):
+                agent_logs = gr.Textbox(
+                    label="日志",
+                    lines=10,
+                    max_lines=20,
+                    interactive=False,
+                    elem_classes="log-box",
+                )
+
+            # ── 旅行方案输出 ──
+            with gr.Group():
+                with gr.Row():
                     gr.Markdown("### 📄 旅行方案")
-                with gr.Column(scale=1, min_width=160):
                     download_btn = gr.DownloadButton(
                         "📥 下载方案",
                         variant="secondary",
                         visible=False,
+                        min_width=140,
                     )
-            final_plan = gr.Markdown()
+                final_plan = gr.Markdown(elem_classes="plan-output")
 
             # ── 追问调整区域 ──
             with gr.Accordion("🔄 追问调整方案", open=False):
-                gr.Markdown("对生成的方案不满意？输入调整指令，仅重算受影响 Agent。")
+                gr.Markdown(
+                    "对生成的方案不满意？输入调整指令，仅重算受影响 Agent。"
+                )
                 with gr.Row():
                     adjustment_input = gr.Textbox(
                         label="调整指令",
                         placeholder='例如："预算提高到 5000"、"换便宜的酒店"、"偏好美食、自然风光"、"改成去西安"',
                         scale=5,
                     )
-                    adjust_btn = gr.Button("📋 应用调整", variant="secondary", scale=1)
+                    adjust_btn = gr.Button(
+                        "📋 应用调整", variant="secondary", scale=1, min_width=120
+                    )
 
-            # 规划按钮 — 流式输出（5 个输出组件）
-            plan_btn.click(
+            # ── 事件绑定 ──
+
+            # 规划按钮 — 流式输出（6 个输出组件，含 stop_btn 状态管理）
+            plan_event = plan_btn.click(
                 plan_travel,
                 [destination, days, budget, departure, preferences],
-                [final_plan, agent_logs, agent_status, plan_state, download_btn],
+                [
+                    final_plan,
+                    agent_logs,
+                    agent_status,
+                    plan_state,
+                    download_btn,
+                    stop_btn,
+                ],
             )
 
-            # 调整按钮
+            # 调整按钮（5 个输出，不含 stop_btn）
             adjust_btn.click(
                 handle_adjustment,
                 [adjustment_input, plan_state],
                 [final_plan, agent_logs, agent_status, plan_state, download_btn],
             )
 
-        with gr.Tab("对话"):
-            chatbot = gr.Chatbot()
-            msg = gr.Textbox(placeholder="输入你的旅行需求...", label="消息")
-            msg.submit(chat, [msg, chatbot], [chatbot]).then(lambda: "", None, msg)
-
-        with gr.Tab("设置"):
-            gr.Markdown("### LLM 配置")
-            with gr.Row():
-                backend = gr.Radio(
-                    ["deepseek", "ollama"], label="后端", value="deepseek"
-                )
-            with gr.Row():
-                model = gr.Dropdown(
-                    label="模型",
-                    value="deepseek-chat",
-                    choices=[],
-                    allow_custom_value=True,
-                )
-                api_key = gr.Textbox(
-                    label="API Key", type="password", value="", visible=True
-                )
-            with gr.Row():
-                base_url = gr.Textbox(
-                    label="Base URL", value="https://api.deepseek.com"
-                )
-            save_btn = gr.Button("保存设置", variant="primary")
-            status = gr.Textbox(label="状态", interactive=False)
-            save_btn.click(
-                update_settings,
-                [backend, model, api_key, base_url],
-                status,
-            )
-
-            # 后端切换：瞬间返回默认值（无 loading），再后台拉模型列表
-            backend.change(
-                on_backend_change,
-                [backend],
-                [model, api_key, base_url],
-                show_progress="hidden",
-            ).then(
-                refresh_model_list,
-                [backend],
-                [model],
-                show_progress="hidden",
-            )
-
-            # 页面加载时回显当前配置，然后后台拉取模型列表
-            app.load(
-                get_config,
+            # 停止按钮 — 中断规划并重置 UI
+            stop_btn.click(
+                handle_cancel,
                 None,
-                [backend, model, api_key, base_url, status],
-                show_progress="hidden",
-            ).then(
-                refresh_model_list,
-                [backend],
-                [model],
-                show_progress="hidden",
+                [final_plan, agent_logs, agent_status, plan_state, download_btn, stop_btn],
+                cancels=[plan_event],
             )
+
+        # ════════════════════════════════════════════════════
+        # Tab 2: 对话
+        # ════════════════════════════════════════════════════
+        with gr.Tab("💬 对话"):
+            chatbot = gr.Chatbot(
+                label="旅行助手",
+                height=460,
+                elem_classes="chat-container",
+            )
+            with gr.Row():
+                msg = gr.Textbox(
+                    placeholder="输入你的旅行需求...",
+                    label="消息",
+                    scale=9,
+                    container=True,
+                )
+                send_btn = gr.Button(
+                    "发送",
+                    variant="primary",
+                    scale=1,
+                    min_width=90,
+                )
+            # 回车发送 / 点击发送
+            msg.submit(chat, [msg, chatbot], [chatbot]).then(
+                lambda: "", None, msg
+            )
+            send_btn.click(chat, [msg, chatbot], [chatbot]).then(
+                lambda: "", None, msg
+            )
+
+        # ════════════════════════════════════════════════════
+        # Tab 3: 设置
+        # ════════════════════════════════════════════════════
+        with gr.Tab("⚙️ 设置"):
+            with gr.Group():
+                gr.Markdown("### ⚙️ LLM 配置")
+                with gr.Row():
+                    backend = gr.Radio(
+                        ["deepseek", "ollama"],
+                        label="后端",
+                        value="deepseek",
+                    )
+                with gr.Row():
+                    model = gr.Dropdown(
+                        label="模型",
+                        value="deepseek-chat",
+                        choices=[],
+                        allow_custom_value=True,
+                        scale=2,
+                    )
+                    api_key = gr.Textbox(
+                        label="API Key",
+                        type="password",
+                        value="",
+                        visible=True,
+                        scale=3,
+                    )
+                with gr.Row():
+                    base_url = gr.Textbox(
+                        label="Base URL",
+                        value="https://api.deepseek.com",
+                    )
+                with gr.Row():
+                    save_btn = gr.Button("💾 保存设置", variant="primary")
+                status = gr.Textbox(
+                    label="状态",
+                    interactive=False,
+                    elem_classes="form-section",
+                )
+
+                save_btn.click(
+                    update_settings,
+                    [backend, model, api_key, base_url],
+                    status,
+                )
+
+                # 后端切换：瞬间返回默认值（无 loading），再后台拉模型列表
+                backend.change(
+                    on_backend_change,
+                    [backend],
+                    [model, api_key, base_url],
+                    show_progress="hidden",
+                ).then(
+                    refresh_model_list,
+                    [backend],
+                    [model],
+                    show_progress="hidden",
+                )
+
+                # 页面加载时回显当前配置，然后后台拉取模型列表
+                app.load(
+                    get_config,
+                    None,
+                    [backend, model, api_key, base_url, status],
+                    show_progress="hidden",
+                ).then(
+                    refresh_model_list,
+                    [backend],
+                    [model],
+                    show_progress="hidden",
+                )
 
 
 # ─── MCP Server 生命周期管理 ──────────────────────────────
@@ -498,6 +815,11 @@ if __name__ == "__main__":
         start_mcp_server()
 
     try:
-        app.launch(server_name="0.0.0.0", server_port=7861, theme=gr.themes.Soft())
+        app.launch(
+            server_name="0.0.0.0",
+            server_port=7861,
+            theme=gr.themes.Soft(),
+            css=CUSTOM_CSS,
+        )
     finally:
         stop_mcp_server()
