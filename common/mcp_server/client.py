@@ -1,6 +1,6 @@
-"""MCP 客户端封装 — 连接 MCP Server 并调用工具。
+"""MCP 客户端封装 — 连接 MCP HTTP Server 并调用工具。
 
-提供 ToolClient 单例，优先通过 MCP 协议调用工具，
+提供 ToolClient 单例，优先通过 Streamable HTTP 协议调用工具，
 如果 MCP Server 不可用，自动回退到直接调用 tools.py 函数。
 """
 
@@ -12,6 +12,11 @@ from typing import Any
 ROOT_DIR = Path(__file__).parent.parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
+
+from common.mcp_server.server import MCP_HOST, MCP_PORT
+
+# MCP Server HTTP 端点 URL
+MCP_SERVER_URL = f"http://{MCP_HOST}:{MCP_PORT}/mcp"
 
 
 async def call_tool_direct(name: str, arguments: dict | None = None) -> Any:
@@ -40,21 +45,15 @@ async def call_tool_direct(name: str, arguments: dict | None = None) -> Any:
     return await func(**args)
 
 
-async def call_tool_via_mcp(name: str, arguments: dict | None = None) -> Any:
-    """通过 MCP 协议调用工具。
+async def call_tool_via_http(name: str, arguments: dict | None = None) -> Any:
+    """通过 Streamable HTTP 协议调用 MCP 工具。
 
-    启动 MCP Server 子进程，连接后调用工具，完成后自动关闭。
+    连接常驻的 MCP HTTP Server，复用已建立的连接会话。
     """
-    from mcp.client.stdio import stdio_client, StdioServerParameters
-    from mcp.client.session import ClientSession
+    from mcp import ClientSession
+    from mcp.client.streamable_http import streamable_http_client
 
-    params = StdioServerParameters(
-        command="uv",
-        args=["run", "python", "-m", "common.mcp_server.server"],
-        cwd=str(ROOT_DIR),
-    )
-
-    async with stdio_client(params) as (read, write):
+    async with streamable_http_client(MCP_SERVER_URL) as (read, write, _get_session_id):
         async with ClientSession(read, write) as session:
             await session.initialize()
 
@@ -66,6 +65,7 @@ async def call_tool_via_mcp(name: str, arguments: dict | None = None) -> Any:
 
             # 解析返回内容
             import json
+
             parsed = []
             for item in result.content:
                 if item.type == "text":
@@ -79,39 +79,52 @@ async def call_tool_via_mcp(name: str, arguments: dict | None = None) -> Any:
             return parsed
 
 
-# MCP 可用状态缓存
+# MCP HTTP 可用状态缓存
+# True  = HTTP Server 可用，优先使用
+# False = HTTP Server 不可用，回退到直接调用
+# None  = 尚未探测
 _mcp_available: bool | None = None
+# 连续失败计数，超过阈值后降级
+_http_fail_count: int = 0
+_MAX_HTTP_FAILS = 3
 
 
 async def call_tool(name: str, arguments: dict | None = None) -> Any:
     """智能调用 MCP 工具。
 
-    首次调用尝试 MCP 协议，成功后缓存可用状态。
-    如果 MCP 不可用，标记并永久回退到直接调用。
+    优先通过 Streamable HTTP 连接常驻 MCP Server，
+    连续失败超过阈值后回退到直接调用 tools.py 函数。
 
     这是 Agent 调用工具的推荐入口。
     """
-    global _mcp_available
+    global _mcp_available, _http_fail_count
 
-    # 如果 MCP 已标记为不可用，直接回退
+    # 已确认 HTTP 不可用，直接回退
     if _mcp_available is False:
         return await call_tool_direct(name, arguments)
 
-    # 首次尝试 MCP 协议
-    if _mcp_available is None:
-        try:
-            result = await call_tool_via_mcp(name, arguments)
-            _mcp_available = True
-            return result
-        except Exception as e:
-            _mcp_available = False
-            print(f"[MCP] {name} 通过 MCP 失败 ({e.__class__.__name__})，永久回退到直接调用")
-            return await call_tool_direct(name, arguments)
-
-    # MCP 已确认可用
+    # 首次探测或之前成功过
     try:
-        return await call_tool_via_mcp(name, arguments)
+        result = await call_tool_via_http(name, arguments)
+        _mcp_available = True
+        _http_fail_count = 0
+        return result
     except Exception as e:
-        _mcp_available = False
-        print(f"[MCP] {name} 连接中断 ({e.__class__.__name__})，回退到直接调用")
+        _http_fail_count += 1
+        if _mcp_available is None:
+            print(
+                f"[MCP] {name} 通过 HTTP 失败 ({e.__class__.__name__})，"
+                f"已回退到直接调用（将重试 HTTP）"
+            )
+        elif _http_fail_count >= _MAX_HTTP_FAILS:
+            _mcp_available = False
+            print(
+                f"[MCP] HTTP 连续失败 {_http_fail_count} 次，"
+                f"永久回退到直接调用"
+            )
+        else:
+            print(
+                f"[MCP] {name} HTTP 调用失败 ({e.__class__.__name__})，"
+                f"本次回退到直接调用 ({_http_fail_count}/{_MAX_HTTP_FAILS})"
+            )
         return await call_tool_direct(name, arguments)

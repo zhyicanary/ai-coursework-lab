@@ -3,7 +3,6 @@
 所有领域 Agent 继承此类，实现 execute 方法即可。
 """
 
-import asyncio
 from abc import ABC, abstractmethod
 from typing import Any
 
@@ -39,29 +38,21 @@ class BaseAgent(ABC):
         messages: list[dict],
         temperature: float = 0.7,
         max_tokens: int = 2000,
-        timeout: float = 5.0,
     ) -> str:
-        """调用 LLM（带超时）。
+        """调用 LLM。
 
         Args:
             messages: 消息列表 [{"role": "...", "content": "..."}]
             temperature: 温度参数
             max_tokens: 最大 token 数
-            timeout: 超时秒数（默认 15s），到期后触发 asyncio.TimeoutError
 
         Returns:
             LLM 返回的文本
-
-        Raises:
-            asyncio.TimeoutError: LLM 调用超时
         """
-        return await asyncio.wait_for(
-            llm.chat_completion(
-                messages=messages,
-                temperature=temperature,
-                max_tokens=max_tokens,
-            ),
-            timeout=timeout,
+        return await llm.chat_completion(
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
         )
 
     async def call_mcp(

@@ -1,7 +1,7 @@
 """MCP Server 主入口 — 注册并启动 FastMCP 服务。
 
 使用方式：
-  # 启动标准输入输出传输（供子进程/Agent调用）
+  # 启动 Streamable HTTP 传输（常驻服务，端口 8765）
   uv run python -m common.mcp_server.server
 
   # 或作为模块导入集成到应用中
@@ -27,6 +27,10 @@ from common.mcp_server.tools import (
     search_attractions,
 )
 
+# MCP Server 配置
+MCP_HOST = "127.0.0.1"
+MCP_PORT = 8765
+
 # 创建 MCP Server 实例
 mcp_server = FastMCP(
     name="TripMind Tools",
@@ -35,6 +39,8 @@ mcp_server = FastMCP(
 提供航班查询、高铁查询、酒店搜索、天气预报、景点检索五大功能。
 所有工具使用模拟数据，演示多 Agent 协作流程。
 """,
+    host=MCP_HOST,
+    port=MCP_PORT,
 )
 
 
@@ -106,13 +112,13 @@ register_tools()
 
 
 async def run_server():
-    """以标准输入输出模式运行 MCP Server。"""
-    await mcp_server.run_stdio_async()
+    """以 Streamable HTTP 模式运行 MCP Server。"""
+    await mcp_server.run_streamable_http_async()
 
 
 def main():
-    """CLI 入口。"""
-    asyncio.run(run_server())
+    """CLI 入口（阻塞式，供子进程启动）。"""
+    mcp_server.run(transport="streamable-http")
 
 
 if __name__ == "__main__":

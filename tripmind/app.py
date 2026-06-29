@@ -428,9 +428,30 @@ with gr.Blocks(title="TripMind - 多Agent旅行规划") as app:
 
 _mcp_process: subprocess.Popen | None = None
 
+from common.mcp_server.server import MCP_HOST, MCP_PORT
+
+
+def _wait_for_mcp_ready(timeout: float = 10.0) -> bool:
+    """等待 MCP HTTP Server 就绪（轮询 health endpoint）。"""
+    import time
+
+    import httpx
+
+    url = f"http://{MCP_HOST}:{MCP_PORT}/mcp"
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        try:
+            resp = httpx.get(url, timeout=2.0)
+            if resp.status_code < 500:
+                return True
+        except Exception:
+            pass
+        time.sleep(0.3)
+    return False
+
 
 def start_mcp_server():
-    """启动 MCP Server 子进程（后台运行）。"""
+    """启动 MCP HTTP Server 子进程（后台常驻）。"""
     global _mcp_process
     if _mcp_process is not None and _mcp_process.poll() is None:
         return
@@ -442,21 +463,27 @@ def start_mcp_server():
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
-        print(f"[MCP] Server started (PID: {_mcp_process.pid})")
+        print(f"[MCP] HTTP Server starting (PID: {_mcp_process.pid})")
+        if _wait_for_mcp_ready():
+            print(
+                f"[MCP] HTTP Server ready at http://{MCP_HOST}:{MCP_PORT}/mcp"
+            )
+        else:
+            print("[MCP] HTTP Server 启动超时，Agent 将自动回退到直接调用")
     except Exception as e:
         print(f"[MCP] Server 启动失败：{e}")
         print("[MCP] Agent 将直接调用 tools.py（不影响功能）")
 
 
 def stop_mcp_server():
-    """关闭 MCP Server 子进程。"""
+    """关闭 MCP HTTP Server 子进程。"""
     global _mcp_process
     if _mcp_process is None:
         return
     try:
         _mcp_process.terminate()
         _mcp_process.wait(timeout=5)
-        print(f"[MCP] Server stopped (PID: {_mcp_process.pid})")
+        print(f"[MCP] HTTP Server stopped (PID: {_mcp_process.pid})")
     except Exception:
         try:
             _mcp_process.kill()
