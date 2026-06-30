@@ -5,7 +5,7 @@
 数据源优先级：
 1. mcp-travel-smart-plan（飞猪/高德/同程/途牛，零配置，需 uvx）
 2. 自有 API Key（WEATHER_API_KEY / AMAP_API_KEY）
-3. 本地模拟数据（mock_data/）
+3. 本地模拟数据（mock_data/，仅在 USE_MOCK=true 时启用）
 """
 
 import json
@@ -22,6 +22,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+USE_MOCK = os.getenv("USE_MOCK", "false").strip().lower() == "true"
 WEATHER_API_KEY = os.getenv("WEATHER_API_KEY", "").strip()
 AMAP_API_KEY = os.getenv("AMAP_API_KEY", "").strip()
 
@@ -524,7 +525,10 @@ async def search_flights(
                     _log_source("search_flights", "飞猪(smart-plan)")
                     return flights
 
-    # 2. 回退到模拟数据
+    # 2. 仅在 USE_MOCK 时回退到模拟数据
+    if not USE_MOCK:
+        _log_source("search_flights", "无可用数据源")
+        return []
     data = _load_json("flights.json")
     key = f"{departure}-{destination}"
     reverse_key = f"{destination}-{departure}"
@@ -619,7 +623,10 @@ async def search_trains(
                 _log_source("search_trains", "飞猪(smart-plan)")
                 return trains
 
-    # 2. 回退到模拟数据
+    # 2. 仅在 USE_MOCK 时回退到模拟数据
+    if not USE_MOCK:
+        _log_source("search_trains", "无可用数据源")
+        return []
     data = _load_json("trains.json")
     key = f"{departure}-{destination}"
     reverse_key = f"{destination}-{departure}"
@@ -706,7 +713,10 @@ async def search_hotels(
                 _log_source("search_hotels", "飞猪(smart-plan)")
                 return hotels
 
-    # 2. 回退到模拟数据
+    # 2. 仅在 USE_MOCK 时回退到模拟数据
+    if not USE_MOCK:
+        _log_source("search_hotels", "无可用数据源")
+        return []
     data = _load_json("hotels.json")
     results = data.get(city, [])
 
@@ -752,9 +762,12 @@ async def get_weather(city: str, days: int = 3) -> dict:
             _log_source("get_weather", "和风天气")
             return result
 
-    # 3. 回退到模拟数据
-    _log_source("get_weather", "模拟数据")
-    return _get_mock_weather(city, days)
+    # 3. 仅在 USE_MOCK 时回退到模拟数据
+    if USE_MOCK:
+        _log_source("get_weather", "模拟数据")
+        return _get_mock_weather(city, days)
+    _log_source("get_weather", "无可用数据源")
+    return {"daily": [], "clothing_advice": "", "impact_on_travel": ""}
 
 
 async def search_attractions(
@@ -806,9 +819,12 @@ async def search_attractions(
     if attractions is None and AMAP_API_KEY:
         attractions = await _call_amap_attractions_api(city, top_k)
 
-    # 3. 回退到模拟数据
-    if attractions is None:
+    # 3. 仅在 USE_MOCK 时回退到模拟数据
+    if attractions is None and USE_MOCK:
         attractions = _get_mock_attractions(city, preferences, top_k)
+    if attractions is None:
+        _log_source("search_attractions", "无可用数据源")
+        return []
 
     # 偏好评分排序
     if preferences and attractions:
