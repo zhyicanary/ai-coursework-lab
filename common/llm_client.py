@@ -36,7 +36,7 @@ class LLMClient:
                 "DEEPSEEK_BASE_URL", "https://api.deepseek.com"
             )
             self.api_key = self.api_key or os.getenv("DEEPSEEK_API_KEY", "")
-            self.model = self.model or os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
+            self.model = self.model or os.getenv("DEEPSEEK_MODEL", "deepseek-v4-flash")
 
         if not self.api_key:
             self.api_key = "sk-placeholder"
@@ -81,20 +81,39 @@ class LLMClient:
             "base_url": self.base_url,
         }
 
-    async def list_models(self) -> list[str]:
-        """获取当前后端可用模型列表（通过 OpenAI 兼容 SDK）。"""
-        try:
-            response = await self.client.models.list()
-            models = [m.id for m in response.data]
-            return models
-        except Exception:
-            return self._default_models()
+    async def list_models(self, backend: str | None = None) -> list[str]:
+        """获取可用模型列表。
 
-    def _default_models(self) -> list[str]:
-        """兜底默认模型列表（当 API 不可用时使用）。"""
-        if self.backend == "ollama":
+        Args:
+            backend: 目标后端（"deepseek" / "ollama"），
+                    不传则使用 self.backend 当前值。
+        """
+        target = backend or self.backend
+        try:
+            if target == "ollama":
+                client = AsyncOpenAI(
+                    api_key="ollama",
+                    base_url=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1"),
+                )
+            else:
+                client = AsyncOpenAI(
+                    api_key=self.api_key or os.getenv("DEEPSEEK_API_KEY", ""),
+                    base_url=self.base_url or os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
+                )
+            response = await client.models.list()
+            models = [m.id for m in response.data]
+            return models if models else self._default_models(target)
+        except Exception:
+            return self._default_models(target)
+
+    def _default_models(self, backend: str | None = None) -> list[str]:
+        """兜底默认模型列表（当 API 不可用时使用）。
+
+        官方模型列表参考：https://api-docs.deepseek.com/zh-cn/api/list-models
+        """
+        if (backend or self.backend) == "ollama":
             return ["gemma4:latest"]
-        return ["deepseek-chat", "deepseek-reasoner", "deepseek-coder"]
+        return ["deepseek-v4-flash", "deepseek-v4-pro"]
 
     async def chat_completion(
         self,

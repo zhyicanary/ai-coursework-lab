@@ -60,7 +60,7 @@ export default function SettingsPage() {
         const fetchModels = async () => {
             setModelsLoading(true);
             try {
-                const res = await fetch(`${API_BASE}/api/models`);
+                const res = await fetch(`${API_BASE}/api/models?backend=${encodeURIComponent(backend)}`);
                 if (res.ok) {
                     const data = await res.json();
                     const list = Array.isArray(data.models) ? data.models : [];

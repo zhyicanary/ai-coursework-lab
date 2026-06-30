@@ -278,11 +278,16 @@ async def travel_adjust(request: TravelAdjustRequest):
 
 
 @app.get("/api/models")
-async def get_models():
-    """获取当前 LLM 后端可用模型列表。"""
+async def get_models(backend: str | None = None):
+    """获取 LLM 后端可用模型列表。
+
+    可通过 ?backend=ollama 或 ?backend=deepseek 指定目标后端，
+    不传则使用当前 llm.backend 的值。
+    """
     try:
-        models = await llm.list_models()
-        return {"backend": llm.backend, "models": models}
+        models = await llm.list_models(backend=backend)
+        target = backend or llm.backend
+        return {"backend": target, "models": models}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
