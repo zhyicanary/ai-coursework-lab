@@ -37,7 +37,7 @@ mcp_server = FastMCP(
     instructions="""TripMind 旅游助手工具集。
 
 提供航班查询、高铁查询、酒店搜索、天气预报、景点检索五大功能。
-所有工具使用模拟数据，演示多 Agent 协作流程。
+数据源三级降级：mcp-travel-smart-plan（飞猪/高德）→ 自有 API Key → 本地模拟数据。
 """,
     host=MCP_HOST,
     port=MCP_PORT,

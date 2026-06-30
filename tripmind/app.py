@@ -3,7 +3,7 @@ import subprocess
 import sys
 import tempfile
 import warnings
-from functools import lru_cache
+
 from pathlib import Path
 
 # 过滤 Gradio 依赖中的 Starlette 弃用警告（Gradio 尚未适配 Starlette 新常量名）
@@ -32,59 +32,17 @@ def update_settings(backend, model, api_key, base_url):
     return f"当前: {backend} / {model}"
 
 
-@lru_cache(maxsize=1)
-def fetch_deepseek_models():
-    """从 DeepSeek 官网获取模型列表，失败时返回默认列表"""
-    try:
-        import os
-
-        import httpx
-        from dotenv import load_dotenv
-
-        load_dotenv()
-        api_key = os.getenv("DEEPSEEK_API_KEY", "")
-
-        if api_key:
-            headers = {"Authorization": f"Bearer {api_key}"}
-            resp = httpx.get(
-                "https://api.deepseek.com/models", headers=headers, timeout=5
-            )
-            if resp.status_code == 200:
-                models = [m["id"] for m in resp.json().get("data", [])]
-                if models:
-                    return models
-
-        return ["deepseek-chat", "deepseek-reasoner", "deepseek-coder"]
-    except Exception:
-        return ["deepseek-chat", "deepseek-reasoner", "deepseek-coder"]
-
-
-def fetch_ollama_models():
-    """从本地 Ollama 获取模型列表"""
-    try:
-        result = subprocess.run(
-            ["ollama", "list"], capture_output=True, text=True, timeout=5
-        )
-        if result.returncode == 0:
-            models = []
-            for line in result.stdout.strip().split("\n")[1:]:
-                name = line.split()[0] if line.strip() else None
-                if name:
-                    models.append(name)
-            return models if models else ["gemma4:latest"]
-        return ["gemma4:latest"]
-    except Exception:
-        return ["gemma4:latest"]
-
-
-def _ensure_model_in_list(models: list[str], saved_model: str) -> list[str]:
-    """确保保存的模型在列表中，且排在第一位"""
-    if saved_model and saved_model not in models:
-        models.insert(0, saved_model)
-    elif saved_model and models and models[0] != saved_model:
-        models.remove(saved_model)
-        models.insert(0, saved_model)
-    return models
+async def refresh_model_list(backend):
+    """后台异步拉取模型列表并更新下拉框（被 .then() 触发，不阻塞 UI）。"""
+    cfg = llm.get_config()
+    models = await llm.list_models()
+    saved = cfg["model"]
+    if saved and saved not in models:
+        models.insert(0, saved)
+    elif saved and models and models[0] != saved:
+        models.remove(saved)
+        models.insert(0, saved)
+    return gr.update(choices=models)
 
 
 def on_backend_change(backend):
@@ -110,19 +68,6 @@ def on_backend_change(backend):
             gr.update(value="", visible=True),
             gr.update(value="https://api.deepseek.com", visible=True),
         )
-
-
-def refresh_model_list(backend):
-    """后台异步拉取模型列表并更新下拉框（被 .then() 触发，不阻塞 UI）。"""
-    cfg = llm.get_config()
-    if backend == "ollama":
-        models = fetch_ollama_models()
-        saved = cfg["model"] if cfg["backend"] == "ollama" else None
-    else:
-        models = fetch_deepseek_models()
-        saved = cfg["model"] if cfg["backend"] == "deepseek" else None
-    models = _ensure_model_in_list(models, saved)
-    return gr.update(choices=models)
 
 
 def get_config():
@@ -778,7 +723,7 @@ def start_mcp_server():
             ["uv", "run", "python", "-m", "common.mcp_server.server"],
             cwd=project_root,
             stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            stderr=None,
         )
         print(f"[MCP] HTTP Server starting (PID: {_mcp_process.pid})")
         if _wait_for_mcp_ready():

@@ -21,6 +21,7 @@ dependencies = [
     { name = "langgraph" },
     { name = "markdown" },
     { name = "mcp" },
+    { name = "mcp-travel-smart-plan" },
     { name = "openai" },
     { name = "pypdf2" },
     { name = "python-docx" },
@@ -42,6 +43,7 @@ requires-dist = [
     { name = "langgraph", specifier = ">=1.2.5" },
     { name = "markdown", specifier = ">=3.10.2" },
     { name = "mcp", specifier = ">=1.28.0" },
+    { name = "mcp-travel-smart-plan", specifier = ">=6.1.0" },
     { name = "openai", specifier = ">=2.43.0" },
     { name = "pypdf2", specifier = ">=3.0.1" },
     { name = "python-docx", specifier = ">=1.2.0" },
@@ -1589,6 +1591,25 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/c1/ee/94c6c50ffc5b5cf4737052275d11b57367f32d1a8516e31dcd60591b3916/mcp-1.28.0.tar.gz", hash = "sha256:559d3f9943674cafbe5744c5d3794f3237e8b47f9bbc58e20c0fad680d8487c2", size = 636040, upload-time = "2026-06-16T21:37:17.996Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/2e/e1/4c1dc1fbb688641a712d34650c3d58bbbdcb314ddb75bc5817bbf33515a4/mcp-1.28.0-py3-none-any.whl", hash = "sha256:9c1e7cf3a9125557e418ecd4fed8e9adddce81b0dfdae4d6601d700f5beb71a4", size = 221959, upload-time = "2026-06-16T21:37:16.579Z" },
+]
+
+[package.optional-dependencies]
+cli = [
+    { name = "python-dotenv" },
+    { name = "typer" },
+]
+
+[[package]]
+name = "mcp-travel-smart-plan"
+version = "6.1.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "httpx" },
+    { name = "mcp", extra = ["cli"] },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/c1/98/170d25d9b02bed4baab58df220ada17bf6306356ea2eaa84ef9abcdd5f0a/mcp_travel_smart_plan-6.1.0.tar.gz", hash = "sha256:c9bc4c460180b2cbf03fae37030ed59a5249662def918e014d752aaa01ad5661", size = 32806, upload-time = "2026-06-22T07:10:02.011Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/47/2d/736eb4abd320012555fecf0cc08dbb6b5063e1ac6ba016861214033c8cec/mcp_travel_smart_plan-6.1.0-py3-none-any.whl", hash = "sha256:90f82c6248388090d7d03a8614a7060bbcf72658aa8b430274322bedc57b1787", size = 16722, upload-time = "2026-06-22T07:10:00.656Z" },
 ]
 
 [[package]]

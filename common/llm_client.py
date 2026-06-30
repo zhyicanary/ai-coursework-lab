@@ -81,6 +81,21 @@ class LLMClient:
             "base_url": self.base_url,
         }
 
+    async def list_models(self) -> list[str]:
+        """获取当前后端可用模型列表（通过 OpenAI 兼容 SDK）。"""
+        try:
+            response = await self.client.models.list()
+            models = [m.id for m in response.data]
+            return models
+        except Exception:
+            return self._default_models()
+
+    def _default_models(self) -> list[str]:
+        """兜底默认模型列表（当 API 不可用时使用）。"""
+        if self.backend == "ollama":
+            return ["gemma4:latest"]
+        return ["deepseek-chat", "deepseek-reasoner", "deepseek-coder"]
+
     async def chat_completion(
         self,
         messages: list[dict],
