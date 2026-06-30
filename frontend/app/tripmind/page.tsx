@@ -124,6 +124,9 @@ export default function TripMindPage() {
     const [error, setError] = useState<string | null>(null);
     const [downloading, setDownloading] = useState(false);
     const [copied, setCopied] = useState(false);
+    const [lastState, setLastState] = useState<Record<string, unknown> | null>(
+        null,
+    );
     const resultRef = useRef<HTMLDivElement>(null);
 
     // Restore results from localStorage on mount
@@ -134,6 +137,7 @@ export default function TripMindPage() {
                 const parsed = JSON.parse(saved);
                 setPlanResult(parsed.planResult);
                 setAdjustResult(parsed.adjustResult || null);
+                if (parsed.lastState) setLastState(parsed.lastState);
             } catch {
                 // ignore corrupt data
             }
@@ -145,10 +149,10 @@ export default function TripMindPage() {
         if (planResult) {
             localStorage.setItem(
                 STORAGE_KEY,
-                JSON.stringify({ planResult, adjustResult }),
+                JSON.stringify({ planResult, adjustResult, lastState }),
             );
         }
-    }, [planResult, adjustResult]);
+    }, [planResult, adjustResult, lastState]);
 
     const togglePreference = (key: string) => {
         setPreferences((prev) =>
@@ -166,6 +170,7 @@ export default function TripMindPage() {
         setError(null);
         setPlanResult(null);
         setAdjustResult(null);
+        setLastState(null);
         localStorage.removeItem(STORAGE_KEY);
         setAgentStatuses(agentDefs.map((a) => ({ ...a, status: "pending" })));
 
@@ -210,6 +215,8 @@ export default function TripMindPage() {
                                 setError(parsed.error);
                             } else if (parsed.final_plan) {
                                 setPlanResult(parsed.final_plan);
+                            } else if (parsed.__full_state__) {
+                                setLastState(parsed.__full_state__);
                             } else {
                                 // Update agent statuses from state keys
                                 const agentKeys: Record<string, string> = {
@@ -256,6 +263,10 @@ export default function TripMindPage() {
     const handleAdjust = async () => {
         const text = adjustInput.trim();
         if (!text || adjustLoading) return;
+        if (!lastState) {
+            setError("请先生成旅行方案后再进行调整");
+            return;
+        }
 
         setAdjustInput("");
         setAdjustLoading(true);
@@ -265,16 +276,22 @@ export default function TripMindPage() {
             const res = await fetch(`${API_BASE}/api/travel/adjust`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ state: planResult, message: text }),
+                body: JSON.stringify({ state: lastState, message: text }),
             });
 
-            if (!res.ok) throw new Error("调整请求失败");
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({}));
+                throw new Error(errData.detail || "调整请求失败");
+            }
 
             const data = await res.json();
-            const result = data.result || data.answer || "调整完成";
-            const adjustText =
-                typeof result === "string" ? result : JSON.stringify(result);
-            setAdjustResult(adjustText);
+            const newPlan = data.final_plan as string | undefined;
+            if (newPlan) {
+                setPlanResult(newPlan);
+                setLastState(data);
+            }
+            const adjustMsg = newPlan ? "方案已更新" : "调整完成";
+            setAdjustResult(adjustMsg);
         } catch (err) {
             setError(err instanceof Error ? err.message : "调整请求失败");
         } finally {

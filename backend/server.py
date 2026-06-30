@@ -246,8 +246,14 @@ async def travel_plan_stream(request: TravelPlanRequest):
             "departure_city": request.departure_city,
         }
         try:
+            accumulated: dict = {}
             async for step in run_travel_planner_stream(tr):
+                for k, v in step.items():
+                    accumulated[k] = v
                 yield f"data: {json.dumps(step, ensure_ascii=False)}\n\n"
+            # Emit full accumulated state for adjust endpoint
+            accumulated["request"] = tr
+            yield f"data: {json.dumps({'__full_state__': accumulated}, ensure_ascii=False)}\n\n"
         except Exception as e:
             yield f"data: {json.dumps({'error': str(e)}, ensure_ascii=False)}\n\n"
 
