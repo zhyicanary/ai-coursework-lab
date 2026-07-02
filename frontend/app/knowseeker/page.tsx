@@ -1,506 +1,592 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import * as React from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
-    Search,
-    Send,
-    Upload,
-    Trash2,
-    FileText,
-    Loader2,
-    Brain,
-    ChevronDown,
-    ChevronUp,
-    Sparkles,
-    Bot,
-    User,
+  AlertCircle,
+  Brain,
+  FileText,
+  FileUp,
+  Lightbulb,
+  Loader2,
+  MessageSquare,
+  Send,
+  Sparkles,
+  Trash2,
+  Upload,
+  User,
 } from "lucide-react";
+
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import {
+  Card,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { toast } from "sonner";
 
-const API_BASE = "http://localhost:8000";
+const API_BASE = "http://localhost:8000/api";
 
-interface Document {
-    id: string;
-    doc_id: string;
-    file_name: string;
-    chunks_count: number;
+interface DocumentItem {
+  id: string;
+  doc_id: string;
+  file_name: string;
+  chunks_count: number;
 }
 
 interface ChatMessage {
-    role: "user" | "assistant";
-    content: string;
-    thinking_trace?: { step: string; content: string; detail?: string }[];
-    citations?: { doc_name: string; content?: string }[];
+  role: "user" | "assistant";
+  content: string;
+  thinking_trace?: { step: string; content: string; detail?: string }[];
+  citations?: { doc_name: string; content?: string }[];
 }
 
-const iconMap: Record<string, { icon: string; color: string }> = {
-    analyze: { icon: "📋", color: "text-blue-500" },
-    retrieve: { icon: "🔍", color: "text-violet-500" },
-    evaluate: { icon: "📊", color: "text-amber-500" },
-    reformulate: { icon: "🔄", color: "text-cyan-500" },
-    generate: { icon: "📝", color: "text-green-500" },
+const iconMap: Record<string, { icon: string; color: string; label: string }> = {
+  analyze: { icon: "📋", color: "text-blue-500", label: "Analyze" },
+  retrieve: { icon: "🔍", color: "text-violet-500", label: "Retrieve" },
+  evaluate: { icon: "📊", color: "text-amber-500", label: "Evaluate" },
+  reformulate: { icon: "🔄", color: "text-cyan-500", label: "Reformulate" },
+  generate: { icon: "📝", color: "text-green-500", label: "Generate" },
 };
 
+const SUGGESTIONS = [
+  "Summarize the key points of my documents",
+  "What are the main topics covered?",
+  "Find relevant information about a specific term",
+];
+
 export default function KnowSeekerPage() {
-    const [documents, setDocuments] = useState<Document[]>([]);
-    const [messages, setMessages] = useState<ChatMessage[]>([]);
-    const [input, setInput] = useState("");
-    const [loading, setLoading] = useState(false);
-    const [uploading, setUploading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    const [expandedThinking, setExpandedThinking] = useState<
-        Record<number, boolean>
-    >({});
-    const fileInputRef = useRef<HTMLInputElement>(null);
-    const chatEndRef = useRef<HTMLDivElement>(null);
+  const [documents, setDocuments] = useState<DocumentItem[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [input, setInput] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [isFetchingDocs, setIsFetchingDocs] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-    const fetchDocuments = useCallback(async () => {
-        try {
-            const res = await fetch(`${API_BASE}/api/documents`);
-            if (res.ok) {
-                const data = await res.json();
-                setDocuments(data);
-            }
-        } catch {
-            // Backend not available yet
-        }
-    }, []);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
-    useEffect(() => {
-        fetchDocuments();
-    }, [fetchDocuments]);
+  const loadDocuments = useCallback(async () => {
+    setIsFetchingDocs(true);
+    try {
+      const res = await fetch(`${API_BASE}/documents`);
+      if (!res.ok) throw new Error("Failed to load documents");
+      const data: DocumentItem[] = await res.json();
+      setDocuments(data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsFetchingDocs(false);
+    }
+  }, []);
 
-    useEffect(() => {
-        chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, [messages]);
+  useEffect(() => {
+    loadDocuments();
+  }, [loadDocuments]);
 
-    const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, isLoading]);
 
-        setUploading(true);
-        setError(null);
+  const handleUploadClick = () => fileInputRef.current?.click();
 
-        try {
-            const formData = new FormData();
-            formData.append("file", file);
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploading(true);
+    setUploadProgress(0);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.upload.onprogress = (ev) => {
+          if (ev.lengthComputable) {
+            setUploadProgress(Math.round((ev.loaded / ev.total) * 100));
+          }
+        };
+        xhr.onload = () =>
+          xhr.status >= 200 && xhr.status < 300
+            ? resolve()
+            : reject(new Error("Upload failed"));
+        xhr.onerror = () => reject(new Error("Upload failed"));
+        xhr.open("POST", `${API_BASE}/documents/upload`);
+        xhr.send(formData);
+      });
+      toast.success("Document uploaded", { description: file.name });
+      await loadDocuments();
+    } catch (err) {
+      toast.error("Upload failed", {
+        description: err instanceof Error ? err.message : "Please try again.",
+      });
+    } finally {
+      setIsUploading(false);
+      setUploadProgress(0);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
 
-            const res = await fetch(`${API_BASE}/api/documents/upload`, {
-                method: "POST",
-                body: formData,
-            });
+  const handleDelete = async (docId: string) => {
+    try {
+      const res = await fetch(`${API_BASE}/documents/${docId}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("Failed to delete");
+      setDocuments((prev) => prev.filter((d) => d.doc_id !== docId));
+      toast.success("Document deleted");
+    } catch (err) {
+      toast.error("Failed to delete document", {
+        description: err instanceof Error ? err.message : undefined,
+      });
+    }
+  };
 
-            if (!res.ok) {
-                const errData = await res.json();
-                throw new Error(errData.detail || "Upload failed");
-            }
+  const handleSend = async (text?: string) => {
+    const question = (text ?? input).trim();
+    if (!question || isLoading) return;
+    setInput("");
+    setError(null);
+    setMessages((prev) => [...prev, { role: "user", content: question }]);
+    setIsLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question }),
+      });
+      if (!res.ok) throw new Error("Failed to get a response");
+      const data = await res.json();
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: data.answer ?? "",
+          thinking_trace: data.thinking_trace,
+          citations: data.citations,
+        },
+      ]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-            await fetchDocuments();
-        } catch (err) {
-            setError(err instanceof Error ? err.message : "Upload failed");
-        } finally {
-            setUploading(false);
-            if (fileInputRef.current) fileInputRef.current.value = "";
-        }
-    };
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
 
-    const handleDelete = async (docId: string) => {
-        try {
-            const res = await fetch(`${API_BASE}/api/documents/${docId}`, {
-                method: "DELETE",
-            });
-            if (res.ok) {
-                await fetchDocuments();
-            }
-        } catch (err) {
-            setError(err instanceof Error ? err.message : "Delete failed");
-        }
-    };
-
-    const handleSend = async () => {
-        const question = input.trim();
-        if (!question || loading) return;
-
-        setInput("");
-        setError(null);
-
-        const userMsg: ChatMessage = { role: "user", content: question };
-        setMessages((prev) => [...prev, userMsg]);
-        setLoading(true);
-
-        try {
-            const res = await fetch(`${API_BASE}/api/chat`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ question }),
-            });
-
-            if (!res.ok) {
-                throw new Error("Chat request failed");
-            }
-
-            const data = await res.json();
-
-            const assistantMsg: ChatMessage = {
-                role: "assistant",
-                content: data.answer || "（未能生成回答）",
-                thinking_trace: data.thinking_trace || [],
-                citations: data.citations || [],
-            };
-
-            setMessages((prev) => [...prev, assistantMsg]);
-        } catch (err) {
-            const errorMsg: ChatMessage = {
-                role: "assistant",
-                content: `请求失败：${err instanceof Error ? err.message : "未知错误"}`,
-            };
-            setMessages((prev) => [...prev, errorMsg]);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleKeyDown = (e: React.KeyboardEvent) => {
-        if (e.key === "Enter" && !e.shiftKey) {
-            e.preventDefault();
-            handleSend();
-        }
-    };
-
-    const toggleThinking = (idx: number) => {
-        setExpandedThinking((prev) => ({ ...prev, [idx]: !prev[idx] }));
-    };
-
-    return (
-        <div className="flex h-[calc(100vh-3.5rem)]">
-            {/* Left Sidebar - Document Management */}
-            <aside className="hidden lg:flex w-72 flex-col border-r bg-sidebar-background/50 backdrop-blur-sm">
-                <div className="p-4 border-b">
-                    <h2 className="text-sm font-semibold flex items-center gap-2">
-                        <FileText className="h-4 w-4 text-primary" />
-                        知识库文档
-                    </h2>
-                    <p className="text-xs text-muted-foreground mt-1">
-                        上传文档以构建 RAG 知识库
-                    </p>
-                </div>
-
-                <div className="p-3">
-                    <input
-                        ref={fileInputRef}
-                        type="file"
-                        className="hidden"
-                        onChange={handleUpload}
-                        accept=".pdf,.txt,.md,.docx,.csv,.json,.xml"
-                    />
-                    <Button
-                        variant="outline"
-                        className="w-full gap-2 border-dashed"
-                        onClick={() => fileInputRef.current?.click()}
-                        disabled={uploading}
-                    >
-                        {uploading ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                            <Upload className="h-4 w-4" />
-                        )}
-                        {uploading ? "上传中..." : "上传文档"}
-                    </Button>
-                    <p className="text-xs text-muted-foreground mt-2 text-center">
-                        支持 PDF, TXT, MD, DOCX
-                    </p>
-                </div>
-
-                <Separator />
-
-                <ScrollArea className="flex-1 px-3 pb-3">
-                    {documents.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-12 text-center">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted mb-3">
-                                <FileText className="h-5 w-5 text-muted-foreground" />
-                            </div>
-                            <p className="text-sm text-muted-foreground">
-                                暂无文档
-                            </p>
-                            <p className="text-xs text-muted-foreground mt-1">
-                                上传后即可开始提问
-                            </p>
-                        </div>
-                    ) : (
-                        <div className="space-y-2 pt-2">
-                            {documents.map((doc) => (
-                                <div
-                                    key={doc.id || doc.doc_id}
-                                    className="group flex items-start justify-between rounded-lg border bg-card p-3 text-sm transition-colors hover:bg-accent/50"
-                                >
-                                    <div className="flex items-start gap-2 min-w-0 flex-1">
-                                        <FileText className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
-                                        <div className="min-w-0">
-                                            <p className="font-medium truncate text-sm">
-                                                {doc.file_name}
-                                            </p>
-                                            <p className="text-xs text-muted-foreground">
-                                                {doc.chunks_count} 个片段
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-7 w-7 text-muted-foreground hover:text-destructive shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                                        onClick={() => handleDelete(doc.doc_id)}
-                                    >
-                                        <Trash2 className="h-3.5 w-3.5" />
-                                    </Button>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </ScrollArea>
-            </aside>
-
-            {/* Main Chat Area */}
-            <div className="flex flex-1 flex-col">
-                {/* Header */}
-                <div className="flex items-center gap-2 border-b px-4 py-3 bg-background/80 backdrop-blur-sm">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500/15 to-blue-500/15 ring-1 ring-violet-500/20">
-                        <Brain className="h-4 w-4 text-violet-600 dark:text-violet-400" />
-                    </div>
-                    <h1 className="text-lg font-semibold">KnowSeeker</h1>
-                    <Badge variant="secondary" className="ml-1 text-xs gap-1">
-                        <Sparkles className="h-3 w-3" />
-                        Agentic RAG
-                    </Badge>
-                </div>
-
-                {/* Chat Messages */}
-                <ScrollArea className="flex-1 scrollbar-thin">
-                    {messages.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center h-full text-center py-16 px-4">
-                            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500/10 to-blue-500/10 ring-1 ring-violet-500/15 mb-4">
-                                <Search className="h-8 w-8 text-violet-500/70" />
-                            </div>
-                            <h2 className="text-xl font-semibold mb-2">
-                                Agentic RAG 知识助手
-                            </h2>
-                            <p className="text-muted-foreground max-w-md text-sm leading-relaxed">
-                                上传文档后即可开始提问。AI Agent
-                                会自主分析问题、制定检索策略并生成精准回答，
-                                支持多轮检索和引用溯源。
-                            </p>
-                        </div>
-                    ) : (
-                        <div className="space-y-6 py-4 px-4 max-w-3xl mx-auto">
-                            {messages.map((msg, idx) => (
-                                <div
-                                    key={idx}
-                                    className={cn(
-                                        "flex gap-3 animate-fade-in-up",
-                                        msg.role === "user"
-                                            ? "justify-end"
-                                            : "justify-start",
-                                    )}
-                                >
-                                    {/* Avatar */}
-                                    {msg.role === "assistant" && (
-                                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-blue-500 text-white">
-                                            <Bot className="h-4 w-4" />
-                                        </div>
-                                    )}
-
-                                    <div
-                                        className={cn(
-                                            "max-w-[80%] rounded-2xl px-4 py-3",
-                                            msg.role === "user"
-                                                ? "bg-primary text-primary-foreground rounded-br-md"
-                                                : "bg-muted rounded-bl-md",
-                                        )}
-                                    >
-                                        <div className="text-sm whitespace-pre-wrap leading-relaxed">
-                                            {msg.content}
-                                        </div>
-
-                                        {/* Thinking Process - Timeline */}
-                                        {msg.role === "assistant" &&
-                                            msg.thinking_trace &&
-                                            msg.thinking_trace.length > 0 && (
-                                                <div className="mt-3 border-t pt-3">
-                                                    <button
-                                                        className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
-                                                        onClick={() =>
-                                                            toggleThinking(idx)
-                                                        }
-                                                    >
-                                                        {expandedThinking[
-                                                            idx
-                                                        ] ? (
-                                                            <ChevronUp className="h-3 w-3" />
-                                                        ) : (
-                                                            <ChevronDown className="h-3 w-3" />
-                                                        )}
-                                                        <Brain className="h-3 w-3" />
-                                                        思考过程 ({
-                                                            msg.thinking_trace
-                                                                .length
-                                                        }{" "}
-                                                        步)
-                                                    </button>
-                                                    {expandedThinking[idx] && (
-                                                        <div className="mt-3 space-y-0">
-                                                            {msg.thinking_trace.map(
-                                                                (step, si) => {
-                                                                    const meta =
-                                                                        iconMap[
-                                                                            step
-                                                                                .step
-                                                                        ] ||
-                                                                        {
-                                                                            icon: "🤖",
-                                                                            color: "text-muted-foreground",
-                                                                        };
-                                                                    const isLast =
-                                                                        si ===
-                                                                        msg
-                                                                            .thinking_trace!
-                                                                            .length -
-                                                                            1;
-                                                                    return (
-                                                                        <div
-                                                                            key={
-                                                                                si
-                                                                            }
-                                                                            className="flex gap-3"
-                                                                        >
-                                                                            {/* Timeline line + dot */}
-                                                                            <div className="flex flex-col items-center">
-                                                                                <div
-                                                                                    className={cn(
-                                                                                        "flex h-6 w-6 items-center justify-center rounded-full bg-muted text-xs",
-                                                                                        meta.color,
-                                                                                    )}
-                                                                                >
-                                                                                    {
-                                                                                        meta.icon
-                                                                                    }
-                                                                                </div>
-                                                                                {!isLast && (
-                                                                                    <div className="w-px flex-1 bg-border min-h-[20px]" />
-                                                                                )}
-                                                                            </div>
-                                                                            {/* Content */}
-                                                                            <div className="pb-3 flex-1">
-                                                                                <p className="text-xs font-medium">
-                                                                                    {
-                                                                                        step.content
-                                                                                    }
-                                                                                </p>
-                                                                                {step.detail && (
-                                                                                    <p className="text-xs text-muted-foreground mt-0.5">
-                                                                                        {
-                                                                                            step.detail
-                                                                                        }
-                                                                                    </p>
-                                                                                )}
-                                                                            </div>
-                                                                        </div>
-                                                                    );
-                                                                },
-                                                            )}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            )}
-
-                                        {/* Citations */}
-                                        {msg.role === "assistant" &&
-                                            msg.citations &&
-                                            msg.citations.length > 0 && (
-                                                <div className="mt-3 border-t pt-3">
-                                                    <p className="text-xs font-medium text-muted-foreground mb-1.5">
-                                                        引用来源
-                                                    </p>
-                                                    <div className="flex flex-wrap gap-1.5">
-                                                        {msg.citations.map(
-                                                            (c, ci) => (
-                                                                <Badge
-                                                                    key={ci}
-                                                                    variant="outline"
-                                                                    className="text-xs gap-1"
-                                                                >
-                                                                    <FileText className="h-3 w-3" />
-                                                                    {c.doc_name}
-                                                                </Badge>
-                                                            ),
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            )}
-                                    </div>
-
-                                    {/* User avatar */}
-                                    {msg.role === "user" && (
-                                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
-                                            <User className="h-4 w-4 text-muted-foreground" />
-                                        </div>
-                                    )}
-                                </div>
-                            ))}
-                            {loading && (
-                                <div className="flex items-center gap-2 text-sm text-muted-foreground pl-11">
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                    Agent 正在思考...
-                                </div>
-                            )}
-                            <div ref={chatEndRef} />
-                        </div>
-                    )}
-                </ScrollArea>
-
-                {/* Error */}
-                {error && (
-                    <div className="mx-4 mb-2 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-2 text-sm text-destructive">
-                        {error}
-                        <button
-                            className="ml-2 underline"
-                            onClick={() => setError(null)}
-                        >
-                            关闭
-                        </button>
-                    </div>
-                )}
-
-                {/* Input Area */}
-                <div className="border-t p-4">
-                    <div className="flex gap-2 max-w-3xl mx-auto">
-                        <Input
-                            value={input}
-                            onChange={(e) => setInput(e.target.value)}
-                            onKeyDown={handleKeyDown}
-                            placeholder="请输入您的问题... (Enter 发送)"
-                            disabled={loading}
-                            className="flex-1"
-                        />
-                        <Button
-                            onClick={handleSend}
-                            disabled={loading || !input.trim()}
-                            size="icon"
-                            className="h-10 w-10"
-                        >
-                            {loading ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                                <Send className="h-4 w-4" />
-                            )}
-                        </Button>
-                    </div>
-                </div>
+  return (
+    <TooltipProvider delayDuration={200}>
+      <div className="flex h-screen w-full overflow-hidden bg-background text-foreground">
+        {/* ===== Sidebar: Document Management ===== */}
+        <aside className="flex w-80 shrink-0 flex-col border-r bg-card">
+          <div className="flex flex-col gap-3 p-4">
+            <div className="flex items-center gap-2.5">
+              <div className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-blue-500 text-primary-foreground shadow-sm">
+                <Brain className="size-5" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-base font-semibold leading-tight">
+                  KnowSeeker
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  Agentic RAG Assistant
+                </span>
+              </div>
             </div>
+          </div>
+          <Separator />
+          <div className="flex flex-col gap-3 p-4">
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="hidden"
+              onChange={handleFileChange}
+              accept=".pdf,.txt,.md,.docx,.csv"
+            />
+            <Button
+              onClick={handleUploadClick}
+              disabled={isUploading}
+              className="w-full"
+            >
+              {isUploading ? (
+                <>
+                  <Loader2 data-icon="inline-start" className="animate-spin" />
+                  Uploading…
+                </>
+              ) : (
+                <>
+                  <Upload data-icon="inline-start" />
+                  Upload Document
+                </>
+              )}
+            </Button>
+            {isUploading && (
+              <div className="flex flex-col gap-1.5">
+                <Progress value={uploadProgress} />
+                <span className="text-xs text-muted-foreground">
+                  {uploadProgress}% uploaded
+                </span>
+              </div>
+            )}
+          </div>
+          <Separator />
+          <div className="flex items-center justify-between px-4 py-3">
+            <span className="text-sm font-medium">Documents</span>
+            <Badge variant="secondary">{documents.length}</Badge>
+          </div>
+          <ScrollArea className="min-h-0 flex-1">
+            <div className="flex flex-col gap-2 px-4 pb-4">
+              {isFetchingDocs ? (
+                <div className="flex flex-col gap-2">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className="flex items-center gap-3 rounded-lg border p-3"
+                    >
+                      <Skeleton className="size-8 rounded-md" />
+                      <div className="flex flex-1 flex-col gap-2">
+                        <Skeleton className="h-3 w-3/4" />
+                        <Skeleton className="h-2.5 w-1/3" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : documents.length === 0 ? (
+                <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed p-6 text-center">
+                  <div className="flex size-10 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                    <FileUp className="size-5" />
+                  </div>
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-sm font-medium">No documents yet</span>
+                    <span className="text-xs text-muted-foreground">
+                      Upload a file to get started
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                documents.map((doc) => (
+                  <div
+                    key={doc.doc_id}
+                    className="group flex items-center gap-3 rounded-lg border bg-background p-3 transition-colors hover:bg-accent"
+                  >
+                    <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                      <FileText className="size-4" />
+                    </div>
+                    <div className="flex min-w-0 flex-1 flex-col gap-1">
+                      <span
+                        className="truncate text-sm font-medium"
+                        title={doc.file_name}
+                      >
+                        {doc.file_name}
+                      </span>
+                      <Badge
+                        variant="secondary"
+                        className="w-fit text-xs font-normal"
+                      >
+                        {doc.chunks_count} chunks
+                      </Badge>
+                    </div>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="size-7 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:text-destructive"
+                          onClick={() => handleDelete(doc.doc_id)}
+                        >
+                          <Trash2 />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Delete document</TooltipContent>
+                    </Tooltip>
+                  </div>
+                ))
+              )}
+            </div>
+          </ScrollArea>
+        </aside>
+
+        {/* ===== Main: Chat ===== */}
+        <main className="flex min-h-0 flex-1 flex-col">
+          <header className="flex h-14 shrink-0 items-center gap-2 border-b px-6">
+            <MessageSquare className="size-5 text-muted-foreground" />
+            <span className="font-semibold">Knowledge Assistant</span>
+            <Badge variant="outline" className="ml-auto gap-1">
+              <Sparkles className="size-3" />
+              Agentic RAG
+            </Badge>
+          </header>
+
+          <div className="flex min-h-0 flex-1 flex-col">
+            {messages.length === 0 && !error ? (
+              <div className="flex flex-1 items-center justify-center p-6">
+                <Card className="w-full max-w-md shadow-sm">
+                  <CardHeader className="items-center text-center">
+                    <div className="flex size-16 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-blue-500 text-primary-foreground shadow-lg">
+                      <Brain className="size-8" />
+                    </div>
+                    <CardTitle className="text-2xl">Ask KnowSeeker</CardTitle>
+                    <CardDescription>
+                      Upload documents on the left, then ask any question.
+                      KnowSeeker retrieves, evaluates, and synthesizes answers —
+                      with a transparent thinking trace and source citations.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardFooter className="flex flex-col items-stretch gap-2">
+                    <span className="self-start text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Try asking
+                    </span>
+                    {SUGGESTIONS.map((s) => (
+                      <Button
+                        key={s}
+                        variant="outline"
+                        className="w-full justify-start"
+                        onClick={() => handleSend(s)}
+                      >
+                        <Lightbulb data-icon="inline-start" />
+                        {s}
+                      </Button>
+                    ))}
+                  </CardFooter>
+                </Card>
+              </div>
+            ) : (
+              <ScrollArea className="min-h-0 flex-1">
+                <div className="mx-auto flex max-w-3xl flex-col gap-6 p-6">
+                  {messages.map((msg, i) => (
+                    <MessageBubble key={i} message={msg} />
+                  ))}
+                  {isLoading && <LoadingBubble />}
+                  {error && (
+                    <Alert variant="destructive">
+                      <AlertCircle className="size-4" />
+                      <AlertTitle>Something went wrong</AlertTitle>
+                      <AlertDescription>{error}</AlertDescription>
+                    </Alert>
+                  )}
+                  <div ref={messagesEndRef} />
+                </div>
+              </ScrollArea>
+            )}
+          </div>
+
+          {/* ===== Input ===== */}
+          <div className="shrink-0 border-t p-4">
+            <div className="mx-auto flex max-w-3xl flex-col gap-2">
+              <div className="flex items-end gap-2 rounded-xl border bg-card p-2 focus-within:ring-2 focus-within:ring-ring">
+                <Textarea
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Ask anything about your documents…"
+                  className="max-h-40 min-h-[28px] flex-1 resize-none border-0 bg-transparent p-1.5 text-sm shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                  rows={1}
+                />
+                <Button
+                  size="icon"
+                  onClick={() => handleSend()}
+                  disabled={!input.trim() || isLoading}
+                  className="size-9 shrink-0"
+                >
+                  {isLoading ? (
+                    <Loader2 className="animate-spin" />
+                  ) : (
+                    <Send />
+                  )}
+                </Button>
+              </div>
+              <p className="text-center text-xs text-muted-foreground">
+                Press{" "}
+                <kbd className="rounded border bg-muted px-1 font-sans text-[10px]">
+                  Enter
+                </kbd>{" "}
+                to send ·{" "}
+                <kbd className="rounded border bg-muted px-1 font-sans text-[10px]">
+                  Shift
+                </kbd>
+                +
+                <kbd className="rounded border bg-muted px-1 font-sans text-[10px]">
+                  Enter
+                </kbd>{" "}
+                for a new line
+              </p>
+            </div>
+          </div>
+        </main>
+      </div>
+    </TooltipProvider>
+  );
+}
+
+function MessageBubble({ message }: { message: ChatMessage }) {
+  const isUser = message.role === "user";
+  return (
+    <div className={`flex gap-3 ${isUser ? "flex-row-reverse" : "flex-row"}`}>
+      <Avatar className="size-8 shrink-0">
+        {isUser ? (
+          <AvatarFallback className="bg-muted text-muted-foreground">
+            <User className="size-4" />
+          </AvatarFallback>
+        ) : (
+          <AvatarFallback className="bg-gradient-to-br from-violet-500 to-blue-500 text-primary-foreground">
+            <Brain className="size-4" />
+          </AvatarFallback>
+        )}
+      </Avatar>
+      <div
+        className={`flex max-w-[80%] flex-col gap-2 ${
+          isUser ? "items-end" : "items-start"
+        }`}
+      >
+        <div
+          className={
+            isUser
+              ? "rounded-2xl rounded-br-sm bg-primary px-4 py-2.5 text-sm text-primary-foreground"
+              : "rounded-2xl rounded-bl-sm bg-muted px-4 py-2.5 text-sm"
+          }
+        >
+          <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
         </div>
-    );
+        {!isUser &&
+          message.thinking_trace &&
+          message.thinking_trace.length > 0 && (
+            <ThinkingTrace trace={message.thinking_trace} />
+          )}
+        {!isUser && message.citations && message.citations.length > 0 && (
+          <Citations citations={message.citations} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ThinkingTrace({
+  trace,
+}: {
+  trace: { step: string; content: string; detail?: string }[];
+}) {
+  return (
+    <div className="w-full rounded-lg border bg-background">
+      <Accordion type="single" collapsible>
+        <AccordionItem value="thinking" className="border-b-0">
+          <AccordionTrigger className="px-3 py-2 text-sm hover:no-underline">
+            <div className="flex items-center gap-2">
+              <Sparkles className="size-4 text-violet-500" />
+              <span className="font-medium">Thinking process</span>
+              <Badge variant="secondary" className="text-xs font-normal">
+                {trace.length} steps
+              </Badge>
+            </div>
+          </AccordionTrigger>
+          <AccordionContent className="px-3 pb-3 pt-0">
+            <div className="flex flex-col gap-1">
+              {trace.map((step, i) => {
+                const meta = iconMap[step.step] ?? {
+                  icon: "•",
+                  color: "text-muted-foreground",
+                  label: step.step,
+                };
+                const isLast = i === trace.length - 1;
+                return (
+                  <div key={i} className="flex gap-3">
+                    <div className="flex flex-col items-center">
+                      <div
+                        className={`flex size-7 items-center justify-center rounded-full bg-muted text-sm ${meta.color}`}
+                      >
+                        {meta.icon}
+                      </div>
+                      {!isLast && <div className="w-px flex-1 bg-border" />}
+                    </div>
+                    <div className="flex flex-1 flex-col gap-1 pb-2">
+                      <span className="text-sm font-medium">{meta.label}</span>
+                      <p className="text-sm leading-relaxed text-muted-foreground">
+                        {step.content}
+                      </p>
+                      {step.detail && (
+                        <div className="rounded-md bg-muted/60 p-2 text-xs text-muted-foreground">
+                          {step.detail}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
+    </div>
+  );
+}
+
+function Citations({
+  citations,
+}: {
+  citations: { doc_name: string; content?: string }[];
+}) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className="text-xs font-medium text-muted-foreground">Sources</span>
+      <div className="flex flex-wrap gap-1.5">
+        {citations.map((c, i) => (
+          <Tooltip key={i}>
+            <TooltipTrigger asChild>
+              <Badge variant="secondary" className="gap-1 font-normal">
+                <FileText className="size-3" />
+                {c.doc_name}
+              </Badge>
+            </TooltipTrigger>
+            {c.content && (
+              <TooltipContent className="max-w-xs">{c.content}</TooltipContent>
+            )}
+          </Tooltip>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function LoadingBubble() {
+  return (
+    <div className="flex gap-3">
+      <Avatar className="size-8 shrink-0">
+        <AvatarFallback className="bg-gradient-to-br from-violet-500 to-blue-500 text-primary-foreground">
+          <Brain className="size-4" />
+        </AvatarFallback>
+      </Avatar>
+      <div className="flex items-center gap-2 rounded-2xl rounded-bl-sm bg-muted px-4 py-3">
+        <Loader2 className="size-4 animate-spin text-muted-foreground" />
+        <span className="text-sm text-muted-foreground">Thinking…</span>
+      </div>
+    </div>
+  );
 }

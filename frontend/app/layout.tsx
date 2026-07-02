@@ -21,6 +21,7 @@ import {
     BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
+import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -61,12 +62,8 @@ function ThemeToggle() {
     };
 
     return (
-        <Button variant="ghost" size="icon" onClick={toggle} className="h-8 w-8">
-            {dark ? (
-                <Sun className="h-4 w-4" />
-            ) : (
-                <Moon className="h-4 w-4" />
-            )}
+        <Button variant="ghost" size="icon" onClick={toggle} className="size-8">
+            {dark ? <Sun className="size-4" /> : <Moon className="size-4" />}
         </Button>
     );
 }
@@ -95,7 +92,6 @@ export default function RootLayout({
                 <SidebarProvider defaultOpen>
                     <AppSidebar />
                     <SidebarInset>
-                        {/* Header with breadcrumb */}
                         <header className="sticky top-0 z-40 flex h-14 shrink-0 items-center gap-2 border-b bg-background/80 backdrop-blur-sm px-4">
                             <SidebarTrigger className="-ml-1" />
                             <Separator
@@ -134,7 +130,7 @@ export default function RootLayout({
                                     href="/"
                                     className="flex items-center gap-1.5 text-sm font-semibold md:hidden"
                                 >
-                                    <Brain className="h-4 w-4 text-primary" />
+                                    <Brain className="size-4 text-primary" />
                                 </Link>
                                 <ThemeToggle />
                             </div>
@@ -142,6 +138,7 @@ export default function RootLayout({
                         <main className="flex-1">{children}</main>
                     </SidebarInset>
                 </SidebarProvider>
+                <Toaster />
             </body>
         </html>
     );

@@ -8,6 +8,8 @@ import {
     AlertCircle,
     Rocket,
     Server,
+    Wifi,
+    WifiOff,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +30,8 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 const API_BASE = "http://localhost:8000";
@@ -40,16 +44,14 @@ export default function SettingsPage() {
     const [baseUrl, setBaseUrl] = useState("https://api.deepseek.com");
     const [loading, setLoading] = useState(false);
     const [modelsLoading, setModelsLoading] = useState(false);
-    const [status, setStatus] = useState<{
-        type: "success" | "error" | "";
-        message: string;
-    }>({ type: "", message: "" });
+    const [backendOnline, setBackendOnline] = useState<boolean | null>(null);
 
     useEffect(() => {
         const load = async () => {
             try {
                 const res = await fetch(`${API_BASE}/api/settings`);
                 if (res.ok) {
+                    setBackendOnline(true);
                     const data = await res.json();
                     const bk = data.backend || "deepseek";
                     setBackend(bk);
@@ -58,7 +60,7 @@ export default function SettingsPage() {
                     setBaseUrl(data.base_url || (bk === "ollama" ? "http://localhost:11434/v1" : "https://api.deepseek.com"));
                 }
             } catch {
-                // Backend not available, use defaults
+                setBackendOnline(false);
             }
         };
         load();
@@ -112,7 +114,6 @@ export default function SettingsPage() {
 
     const handleSave = async () => {
         setLoading(true);
-        setStatus({ type: "", message: "" });
 
         try {
             const res = await fetch(`${API_BASE}/api/settings`, {
@@ -127,19 +128,13 @@ export default function SettingsPage() {
             });
 
             if (res.ok) {
-                setStatus({
-                    type: "success",
-                    message: `配置已保存 — ${backend} / ${model}`,
-                });
+                toast.success(`配置已保存 — ${backend} / ${model}`);
             } else {
                 const err = await res.json().catch(() => ({ detail: "保存失败" }));
                 throw new Error(err.detail || "保存失败");
             }
         } catch (err) {
-            setStatus({
-                type: "error",
-                message: err instanceof Error ? err.message : "保存设置失败",
-            });
+            toast.error(err instanceof Error ? err.message : "保存设置失败");
         } finally {
             setLoading(false);
         }
@@ -164,11 +159,11 @@ export default function SettingsPage() {
 
     return (
         <div className="scrollbar-thin overflow-auto p-4 md:p-8">
-            <div className="max-w-2xl mx-auto space-y-6">
+            <div className="max-w-2xl mx-auto flex flex-col gap-6">
                 {/* Header */}
                 <div className="flex items-center gap-3 animate-fade-in">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500/15 to-orange-500/15 ring-1 ring-amber-500/20">
-                        <Settings className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                    <div className="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500/15 to-orange-500/15 ring-1 ring-amber-500/20">
+                        <Settings className="size-5 text-amber-600 dark:text-amber-400" />
                     </div>
                     <div>
                         <h1 className="text-2xl font-bold">系统设置</h1>
@@ -176,7 +171,35 @@ export default function SettingsPage() {
                             配置 AI 模型后端和连接参数
                         </p>
                     </div>
+                    <div className="ml-auto">
+                        {backendOnline === true && (
+                            <Badge variant="secondary" className="gap-1 text-emerald-600 dark:text-emerald-400">
+                                <Wifi className="size-3" />
+                                已连接
+                            </Badge>
+                        )}
+                        {backendOnline === false && (
+                            <Badge variant="destructive" className="gap-1">
+                                <WifiOff className="size-3" />
+                                未连接
+                            </Badge>
+                        )}
+                    </div>
                 </div>
+
+                {/* Backend Offline Alert */}
+                {backendOnline === false && (
+                    <Alert variant="warning">
+                        <AlertCircle className="size-4" />
+                        <AlertDescription>
+                            后端服务未运行。请在项目根目录执行{" "}
+                            <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                                uv run uvicorn backend.server:app --port 8000
+                            </code>{" "}
+                            启动后端。
+                        </AlertDescription>
+                    </Alert>
+                )}
 
                 {/* Backend Settings */}
                 <Card className="animate-fade-in-up overflow-hidden">
@@ -186,9 +209,9 @@ export default function SettingsPage() {
                             选择 LLM 后端并配置连接参数
                         </CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-6 pt-4">
-                        {/* Backend Selector — Radio Cards */}
-                        <div className="space-y-2">
+                    <CardContent className="flex flex-col gap-6 pt-4">
+                        {/* Backend Selector */}
+                        <div className="flex flex-col gap-2">
                             <Label>LLM 后端</Label>
                             <div className="grid gap-3 sm:grid-cols-2">
                                 {backendOptions.map((opt) => {
@@ -207,11 +230,11 @@ export default function SettingsPage() {
                                         >
                                             <div
                                                 className={cn(
-                                                    "flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br text-white shadow-sm",
+                                                    "flex size-10 items-center justify-center rounded-lg bg-gradient-to-br text-white shadow-sm",
                                                     opt.gradient,
                                                 )}
                                             >
-                                                <Icon className="h-5 w-5" />
+                                                <Icon className="size-5" />
                                             </div>
                                             <div>
                                                 <p className="font-medium text-sm">
@@ -222,8 +245,8 @@ export default function SettingsPage() {
                                                 </p>
                                             </div>
                                             {active && (
-                                                <div className="absolute right-3 top-3 flex h-5 w-5 items-center justify-center rounded-full bg-primary">
-                                                    <CheckCircle2 className="h-3 w-3 text-primary-foreground" />
+                                                <div className="absolute right-3 top-3 flex size-5 items-center justify-center rounded-full bg-primary">
+                                                    <CheckCircle2 className="size-3 text-primary-foreground" />
                                                 </div>
                                             )}
                                         </button>
@@ -233,7 +256,7 @@ export default function SettingsPage() {
                         </div>
 
                         {/* Model */}
-                        <div className="space-y-2">
+                        <div className="flex flex-col gap-2">
                             <Label>模型</Label>
                             <Select
                                 value={model}
@@ -271,7 +294,7 @@ export default function SettingsPage() {
 
                         {/* API Key - shown only for deepseek */}
                         {backend === "deepseek" && (
-                            <div className="space-y-2 animate-fade-in">
+                            <div className="flex flex-col gap-2 animate-fade-in">
                                 <Label htmlFor="api-key">API Key</Label>
                                 <Input
                                     id="api-key"
@@ -287,7 +310,7 @@ export default function SettingsPage() {
                         )}
 
                         {/* Base URL */}
-                        <div className="space-y-2">
+                        <div className="flex flex-col gap-2">
                             <Label htmlFor="base-url">Base URL</Label>
                             <Input
                                 id="base-url"
@@ -313,33 +336,14 @@ export default function SettingsPage() {
                             <Button
                                 onClick={handleSave}
                                 disabled={loading}
-                                className="gap-2"
                             >
                                 {loading ? (
-                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    <Loader2 className="size-4 animate-spin" data-icon="inline-start" />
                                 ) : (
-                                    <CheckCircle2 className="h-4 w-4" />
+                                    <CheckCircle2 className="size-4" data-icon="inline-start" />
                                 )}
                                 {loading ? "保存中..." : "保存设置"}
                             </Button>
-
-                            {status.type && (
-                                <div
-                                    className={cn(
-                                        "flex items-center gap-2 text-sm animate-fade-in",
-                                        status.type === "success"
-                                            ? "text-emerald-600 dark:text-emerald-400"
-                                            : "text-destructive",
-                                    )}
-                                >
-                                    {status.type === "success" ? (
-                                        <CheckCircle2 className="h-4 w-4" />
-                                    ) : (
-                                        <AlertCircle className="h-4 w-4" />
-                                    )}
-                                    {status.message}
-                                </div>
-                            )}
                         </div>
                     </CardContent>
                 </Card>
