@@ -4,6 +4,7 @@
   - common/document_loader.py  → 解析和分块
   - common/vector_store.py     → ChromaDB CRUD（add_documents / search_documents）
   - common/embedding_client.py → embedding 向量化（由 vector_store 内部调用）
+  - common/reranker.py         → Cross-Encoder 重排序（两阶段检索第二阶段）
 """
 
 import hashlib
@@ -13,6 +14,7 @@ from typing import IO
 
 from common.document_loader import Document, load, chunk_documents
 from common.vector_store import add_documents, search_documents, init_collection, client
+from common.reranker import reranker
 
 
 def index_document(
@@ -64,7 +66,7 @@ def index_document(
 
 
 def search(query: str, top_k: int = 5) -> list[dict]:
-    """在知识库中语义搜索文档片段。
+    """在知识库中语义搜索文档片段（单阶段向量检索）。
 
     Args:
         query: 用户查询。
@@ -74,6 +76,67 @@ def search(query: str, top_k: int = 5) -> list[dict]:
         [{content, doc_id, chunk_index, score}, ...]
     """
     return search_documents(query=query, top_k=top_k)
+
+
+def search_with_rerank(
+    query: str,
+    top_k: int = 5,
+    recall_k: int = 20,
+) -> tuple[list[dict], dict]:
+    """两阶段检索：向量粗召回 → Cross-Encoder 精排序。
+
+    第一阶段：ChromaDB 向量检索 recall_k 条（快，但精度一般）
+    第二阶段：Cross-Encoder 逐对打分重排，取 top_k（慢，但精度高）
+
+    Args:
+        query: 用户查询。
+        top_k: 最终返回结果数。
+        recall_k: 第一阶段粗召回数量（应 > top_k）。
+
+    Returns:
+        (reranked_results, rerank_info)
+        - reranked_results: 重排后的文档列表
+        - rerank_info: 重排序元信息（供 trace 可视化）
+    """
+    # 第一阶段：向量粗召回
+    candidates = search_documents(query=query, top_k=recall_k)
+
+    if not candidates:
+        return [], {"recall_count": 0, "rerank_count": 0, "reranked": False}
+
+    # 记录粗召回分数（用于对比）
+    recall_scores = [
+        {"doc_id": c.get("doc_id", ""), "recall_score": c.get("score", 0)}
+        for c in candidates
+    ]
+
+    # 第二阶段：Cross-Encoder 精排序
+    try:
+        reranked = reranker.rerank(query=query, documents=candidates, top_k=top_k)
+        reranked_flag = True
+    except Exception:
+        # Reranker 失败时降级：直接用向量检索结果
+        reranked = candidates[:top_k]
+        reranked_flag = False
+
+    # 记录重排序信息
+    rerank_scores = [
+        {
+            "doc_id": r.get("doc_id", ""),
+            "recall_score": r.get("score", 0),
+            "rerank_score": r.get("rerank_score", 0),
+        }
+        for r in reranked
+    ]
+
+    info = {
+        "recall_count": len(candidates),
+        "rerank_count": len(reranked),
+        "reranked": reranked_flag,
+        "score_changes": rerank_scores,
+    }
+
+    return reranked, info
 
 
 def list_documents() -> list[dict]:

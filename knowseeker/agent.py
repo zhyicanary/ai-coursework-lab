@@ -13,7 +13,7 @@ from typing import Literal, TypedDict
 from langgraph.graph import END, START, StateGraph
 
 from common.llm_client import llm
-from knowseeker.rag_chain import search as search_docs
+from knowseeker.rag_chain import search_with_rerank
 
 # ── Agent 状态定义 ────────────────────────────────────────
 
@@ -162,7 +162,7 @@ async def analyze_question(state: AgentState) -> AgentState:
 
 
 async def retrieve(state: AgentState) -> AgentState:
-    """执行向量检索。"""
+    """执行两阶段检索：向量粗召回 → Cross-Encoder 精排序。"""
     state = dict(state)
     trace = list(state.get("thinking_trace", []))
     history = list(state.get("search_history", []))
@@ -180,21 +180,36 @@ async def retrieve(state: AgentState) -> AgentState:
     query = " ".join(keywords) if isinstance(keywords, list) else keywords
 
     try:
-        results = search_docs(query=query, top_k=5)
+        # 两阶段检索：粗召回 20 条 → 重排序取 5 条
+        results, rerank_info = search_with_rerank(
+            query=query, top_k=5, recall_k=20
+        )
+
         if not results:
             trace.append({
                 "step": "retrieve",
                 "content": f"🔍 第 {current_round} 轮检索：没有找到相关结果",
                 "detail": f"查询：「{query}」",
             })
-        else:
+        elif rerank_info.get("reranked", False):
+            # 两阶段检索成功
+            recall_count = rerank_info["recall_count"]
+            best_rerank = rerank_info["score_changes"][0]["rerank_score"] if rerank_info.get("score_changes") else 0
             trace.append({
                 "step": "retrieve",
-                "content": f"🔍 第 {current_round} 轮检索：找到 {len(results)} 条结果",
+                "content": f"🔍 第 {current_round} 轮检索：粗召回 {recall_count} 条 → 重排序取 {len(results)} 条",
+                "detail": f"查询：「{query}」  Cross-Encoder 最佳得分：{best_rerank:.3f}",
+            })
+        else:
+            # Reranker 降级，仅向量检索
+            trace.append({
+                "step": "retrieve",
+                "content": f"🔍 第 {current_round} 轮检索：找到 {len(results)} 条结果（重排序降级，仅向量检索）",
                 "detail": f"查询：「{query}」  最佳得分：{results[0].get('score', 0):.3f}",
             })
     except Exception as e:
         results = []
+        rerank_info = {"reranked": False}
         trace.append({
             "step": "retrieve",
             "content": f"⚠️ 检索异常：{e}",
@@ -207,6 +222,8 @@ async def retrieve(state: AgentState) -> AgentState:
         "query": query,
         "results_count": len(results),
         "top_chunks": results[:3],  # 只保留前 3 条给 LLM
+        "reranked": rerank_info.get("reranked", False),
+        "recall_count": rerank_info.get("recall_count", 0),
     }
     history.append(round_record)
     state["search_history"] = history

@@ -33,6 +33,8 @@ from tripmind.orchestrator import (
 )
 from tripmind.types import TravelRequest
 from common.llm_client import llm
+from common.embedding_client import embedding
+from common.reranker import reranker
 from common.mcp_server.server import MCP_HOST, MCP_PORT
 
 # ── MCP Server 生命周期管理 ──────────────────────────────
@@ -128,10 +130,17 @@ class TravelAdjustRequest(BaseModel):
 
 
 class SettingsRequest(BaseModel):
+    # 推理层 (LLM)
     backend: str | None = None
     model: str | None = None
     api_key: str | None = None
     base_url: str | None = None
+    # 向量化层 (Embedding)
+    embedding_model: str | None = None
+    embedding_base_url: str | None = None
+    # 重排序层 (Reranker)
+    reranker_model: str | None = None
+    reranker_enabled: bool | None = None
 
 
 # ── FastAPI 应用 ──────────────────────────────────────────
@@ -300,24 +309,63 @@ async def get_models(backend: str | None = None):
 
 @app.get("/api/settings")
 async def get_settings():
-    """获取当前 LLM 配置。"""
+    """获取当前全部模型配置（推理层 + 向量化层 + 重排序层）。"""
     try:
-        return llm.get_config()
+        llm_config = llm.get_config()
+        emb_config = embedding.get_config()
+        rerank_config = reranker.get_config()
+        return {
+            # 推理层
+            "backend": llm_config.get("backend"),
+            "model": llm_config.get("model"),
+            "api_key": llm_config.get("api_key"),
+            "base_url": llm_config.get("base_url"),
+            # 向量化层
+            "embedding_model": emb_config.get("model"),
+            "embedding_base_url": emb_config.get("base_url"),
+            # 重排序层
+            "reranker_model": rerank_config.get("model"),
+            "reranker_enabled": rerank_config.get("enabled"),
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/api/settings")
 async def update_settings(settings: SettingsRequest):
-    """更新 LLM 配置并持久化到 .env。"""
+    """更新模型配置并持久化到 .env。
+
+    三层独立配置：
+    - 推理层: DeepSeek / Ollama 热切换
+    - 向量化层: Ollama 本地模型
+    - 重排序层: sentence-transformers 本地模型，可开关
+    """
     try:
-        llm.update(
-            backend=settings.backend,
-            model=settings.model,
-            api_key=settings.api_key,
-            base_url=settings.base_url,
-        )
-        return llm.get_config()
+        # 推理层
+        if settings.backend or settings.model or settings.api_key or settings.base_url:
+            llm.update(
+                backend=settings.backend,
+                model=settings.model,
+                api_key=settings.api_key,
+                base_url=settings.base_url,
+            )
+
+        # 向量化层
+        if settings.embedding_model or settings.embedding_base_url:
+            embedding.update(
+                model=settings.embedding_model,
+                base_url=settings.embedding_base_url,
+            )
+
+        # 重排序层
+        if settings.reranker_model or settings.reranker_enabled is not None:
+            reranker.update(
+                model=settings.reranker_model,
+                enabled=settings.reranker_enabled,
+            )
+
+        # 返回最新配置
+        return await get_settings()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

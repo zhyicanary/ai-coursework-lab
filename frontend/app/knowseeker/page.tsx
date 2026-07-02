@@ -64,17 +64,17 @@ interface ChatMessage {
 }
 
 const iconMap: Record<string, { icon: string; color: string; label: string }> = {
-  analyze: { icon: "📋", color: "text-blue-500", label: "Analyze" },
-  retrieve: { icon: "🔍", color: "text-violet-500", label: "Retrieve" },
-  evaluate: { icon: "📊", color: "text-amber-500", label: "Evaluate" },
-  reformulate: { icon: "🔄", color: "text-cyan-500", label: "Reformulate" },
-  generate: { icon: "📝", color: "text-green-500", label: "Generate" },
+  analyze: { icon: "📋", color: "text-blue-500", label: "问题分析" },
+  retrieve: { icon: "🔍", color: "text-violet-500", label: "检索知识" },
+  evaluate: { icon: "📊", color: "text-amber-500", label: "评估结果" },
+  reformulate: { icon: "🔄", color: "text-cyan-500", label: "重写查询" },
+  generate: { icon: "📝", color: "text-green-500", label: "生成回答" },
 };
 
 const SUGGESTIONS = [
-  "Summarize the key points of my documents",
-  "What are the main topics covered?",
-  "Find relevant information about a specific term",
+  "总结我的文档要点",
+  "文档涵盖了哪些主要主题？",
+  "查找某个特定术语的相关信息",
 ];
 
 export default function KnowSeekerPage() {
@@ -94,7 +94,7 @@ export default function KnowSeekerPage() {
     setIsFetchingDocs(true);
     try {
       const res = await fetch(`${API_BASE}/documents`);
-      if (!res.ok) throw new Error("Failed to load documents");
+      if (!res.ok) throw new Error("加载文档失败");
       const data: DocumentItem[] = await res.json();
       setDocuments(data);
     } catch (err) {
@@ -132,16 +132,16 @@ export default function KnowSeekerPage() {
         xhr.onload = () =>
           xhr.status >= 200 && xhr.status < 300
             ? resolve()
-            : reject(new Error("Upload failed"));
-        xhr.onerror = () => reject(new Error("Upload failed"));
+            : reject(new Error("上传失败"));
+        xhr.onerror = () => reject(new Error("上传失败"));
         xhr.open("POST", `${API_BASE}/documents/upload`);
         xhr.send(formData);
       });
-      toast.success("Document uploaded", { description: file.name });
+      toast.success("文档上传成功", { description: file.name });
       await loadDocuments();
     } catch (err) {
-      toast.error("Upload failed", {
-        description: err instanceof Error ? err.message : "Please try again.",
+      toast.error("上传失败", {
+        description: err instanceof Error ? err.message : "请重试",
       });
     } finally {
       setIsUploading(false);
@@ -155,11 +155,11 @@ export default function KnowSeekerPage() {
       const res = await fetch(`${API_BASE}/documents/${docId}`, {
         method: "DELETE",
       });
-      if (!res.ok) throw new Error("Failed to delete");
+      if (!res.ok) throw new Error("删除失败");
       setDocuments((prev) => prev.filter((d) => d.doc_id !== docId));
-      toast.success("Document deleted");
+      toast.success("文档已删除");
     } catch (err) {
-      toast.error("Failed to delete document", {
+      toast.error("删除文档失败", {
         description: err instanceof Error ? err.message : undefined,
       });
     }
@@ -178,7 +178,7 @@ export default function KnowSeekerPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ question }),
       });
-      if (!res.ok) throw new Error("Failed to get a response");
+      if (!res.ok) throw new Error("获取回答失败");
       const data = await res.json();
       setMessages((prev) => [
         ...prev,
@@ -190,7 +190,7 @@ export default function KnowSeekerPage() {
         },
       ]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      setError(err instanceof Error ? err.message : "发生错误");
     } finally {
       setIsLoading(false);
     }
@@ -206,7 +206,7 @@ export default function KnowSeekerPage() {
   return (
     <TooltipProvider delayDuration={200}>
       <div className="flex h-screen w-full overflow-hidden bg-background text-foreground">
-        {/* ===== Sidebar: Document Management ===== */}
+        {/* ===== 侧边栏：文档管理 ===== */}
         <aside className="flex w-80 shrink-0 flex-col border-r bg-card">
           <div className="flex flex-col gap-3 p-4">
             <div className="flex items-center gap-2.5">
@@ -218,7 +218,7 @@ export default function KnowSeekerPage() {
                   KnowSeeker
                 </span>
                 <span className="text-xs text-muted-foreground">
-                  Agentic RAG Assistant
+                  Agentic RAG 知识助手
                 </span>
               </div>
             </div>
@@ -240,12 +240,12 @@ export default function KnowSeekerPage() {
               {isUploading ? (
                 <>
                   <Loader2 data-icon="inline-start" className="animate-spin" />
-                  Uploading…
+                  上传中…
                 </>
               ) : (
                 <>
                   <Upload data-icon="inline-start" />
-                  Upload Document
+                  上传文档
                 </>
               )}
             </Button>
@@ -253,14 +253,14 @@ export default function KnowSeekerPage() {
               <div className="flex flex-col gap-1.5">
                 <Progress value={uploadProgress} />
                 <span className="text-xs text-muted-foreground">
-                  {uploadProgress}% uploaded
+                  已上传 {uploadProgress}%
                 </span>
               </div>
             )}
           </div>
           <Separator />
           <div className="flex items-center justify-between px-4 py-3">
-            <span className="text-sm font-medium">Documents</span>
+            <span className="text-sm font-medium">文档列表</span>
             <Badge variant="secondary">{documents.length}</Badge>
           </div>
           <ScrollArea className="min-h-0 flex-1">
@@ -286,9 +286,9 @@ export default function KnowSeekerPage() {
                     <FileUp className="size-5" />
                   </div>
                   <div className="flex flex-col gap-0.5">
-                    <span className="text-sm font-medium">No documents yet</span>
+                    <span className="text-sm font-medium">暂无文档</span>
                     <span className="text-xs text-muted-foreground">
-                      Upload a file to get started
+                      上传文件即可开始
                     </span>
                   </div>
                 </div>
@@ -312,7 +312,7 @@ export default function KnowSeekerPage() {
                         variant="secondary"
                         className="w-fit text-xs font-normal"
                       >
-                        {doc.chunks_count} chunks
+                        {doc.chunks_count} 个分块
                       </Badge>
                     </div>
                     <Tooltip>
@@ -326,7 +326,7 @@ export default function KnowSeekerPage() {
                           <Trash2 />
                         </Button>
                       </TooltipTrigger>
-                      <TooltipContent>Delete document</TooltipContent>
+                      <TooltipContent>删除文档</TooltipContent>
                     </Tooltip>
                   </div>
                 ))
@@ -335,11 +335,11 @@ export default function KnowSeekerPage() {
           </ScrollArea>
         </aside>
 
-        {/* ===== Main: Chat ===== */}
+        {/* ===== 主区：聊天 ===== */}
         <main className="flex min-h-0 flex-1 flex-col">
           <header className="flex h-14 shrink-0 items-center gap-2 border-b px-6">
             <MessageSquare className="size-5 text-muted-foreground" />
-            <span className="font-semibold">Knowledge Assistant</span>
+            <span className="font-semibold">知识问答助手</span>
             <Badge variant="outline" className="ml-auto gap-1">
               <Sparkles className="size-3" />
               Agentic RAG
@@ -354,16 +354,16 @@ export default function KnowSeekerPage() {
                     <div className="flex size-16 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-blue-500 text-primary-foreground shadow-lg">
                       <Brain className="size-8" />
                     </div>
-                    <CardTitle className="text-2xl">Ask KnowSeeker</CardTitle>
+                    <CardTitle className="text-2xl">向 KnowSeeker 提问</CardTitle>
                     <CardDescription>
-                      Upload documents on the left, then ask any question.
-                      KnowSeeker retrieves, evaluates, and synthesizes answers —
-                      with a transparent thinking trace and source citations.
+                      在左侧上传文档，然后提出任何问题。
+                      KnowSeeker 会自主检索、评估并综合答案 ——
+                      附带透明的思考过程和来源引用。
                     </CardDescription>
                   </CardHeader>
                   <CardFooter className="flex flex-col items-stretch gap-2">
                     <span className="self-start text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      Try asking
+                      试试这些问题
                     </span>
                     {SUGGESTIONS.map((s) => (
                       <Button
@@ -389,7 +389,7 @@ export default function KnowSeekerPage() {
                   {error && (
                     <Alert variant="destructive">
                       <AlertCircle className="size-4" />
-                      <AlertTitle>Something went wrong</AlertTitle>
+                      <AlertTitle>出现错误</AlertTitle>
                       <AlertDescription>{error}</AlertDescription>
                     </Alert>
                   )}
@@ -399,7 +399,7 @@ export default function KnowSeekerPage() {
             )}
           </div>
 
-          {/* ===== Input ===== */}
+          {/* ===== 输入区 ===== */}
           <div className="shrink-0 border-t p-4">
             <div className="mx-auto flex max-w-3xl flex-col gap-2">
               <div className="flex items-end gap-2 rounded-xl border bg-card p-2 focus-within:ring-2 focus-within:ring-ring">
@@ -407,7 +407,7 @@ export default function KnowSeekerPage() {
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder="Ask anything about your documents…"
+                  placeholder="输入你想了解的问题…"
                   className="max-h-40 min-h-[28px] flex-1 resize-none border-0 bg-transparent p-1.5 text-sm shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
                   rows={1}
                 />
@@ -425,11 +425,11 @@ export default function KnowSeekerPage() {
                 </Button>
               </div>
               <p className="text-center text-xs text-muted-foreground">
-                Press{" "}
+                按{" "}
                 <kbd className="rounded border bg-muted px-1 font-sans text-[10px]">
                   Enter
                 </kbd>{" "}
-                to send ·{" "}
+                发送 ·{" "}
                 <kbd className="rounded border bg-muted px-1 font-sans text-[10px]">
                   Shift
                 </kbd>
@@ -437,7 +437,7 @@ export default function KnowSeekerPage() {
                 <kbd className="rounded border bg-muted px-1 font-sans text-[10px]">
                   Enter
                 </kbd>{" "}
-                for a new line
+                换行
               </p>
             </div>
           </div>
@@ -501,9 +501,9 @@ function ThinkingTrace({
           <AccordionTrigger className="px-3 py-2 text-sm hover:no-underline">
             <div className="flex items-center gap-2">
               <Sparkles className="size-4 text-violet-500" />
-              <span className="font-medium">Thinking process</span>
+              <span className="font-medium">思考过程</span>
               <Badge variant="secondary" className="text-xs font-normal">
-                {trace.length} steps
+                {trace.length} 步
               </Badge>
             </div>
           </AccordionTrigger>
@@ -555,7 +555,7 @@ function Citations({
 }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <span className="text-xs font-medium text-muted-foreground">Sources</span>
+      <span className="text-xs font-medium text-muted-foreground">来源引用</span>
       <div className="flex flex-wrap gap-1.5">
         {citations.map((c, i) => (
           <Tooltip key={i}>
@@ -585,7 +585,7 @@ function LoadingBubble() {
       </Avatar>
       <div className="flex items-center gap-2 rounded-2xl rounded-bl-sm bg-muted px-4 py-3">
         <Loader2 className="size-4 animate-spin text-muted-foreground" />
-        <span className="text-sm text-muted-foreground">Thinking…</span>
+        <span className="text-sm text-muted-foreground">思考中…</span>
       </div>
     </div>
   );

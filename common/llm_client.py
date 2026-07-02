@@ -96,9 +96,11 @@ class LLMClient:
                     base_url=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1"),
                 )
             else:
+                # 查询 DeepSeek 模型时，用 DeepSeek 专属的 key 和 url，
+                # 而非 self.api_key/self.base_url（它们可能是 Ollama 的值）
                 client = AsyncOpenAI(
-                    api_key=self.api_key or os.getenv("DEEPSEEK_API_KEY", ""),
-                    base_url=self.base_url or os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
+                    api_key=os.getenv("DEEPSEEK_API_KEY", self.api_key or ""),
+                    base_url=os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
                 )
             response = await client.models.list()
             models = [m.id for m in response.data]
