@@ -2,11 +2,11 @@
 
 ## 职责
 
-TripMind 是一个基于 **LangGraph** 状态机编排和 **Gradio** 前端构建的**多智能体旅行规划系统**。它是 `ai-coursework-lab` 系列中的第二个课程项目，展示了**多智能体编排范式**：用户的旅行请求被分解为并行的和顺序的子任务，每个子任务由专门的智能体（天气、交通、酒店、行程、预算、汇总器）处理。该系统与同一技术基础下的兄弟项目 `knowseeker/`（单智能体 RAG）共享 `common/` 模块（LLM 客户端、MCP 服务器、向量存储）。
+TripMind 是一个基于 **LangGraph** 状态机编排的多智能体旅行规划系统。它是 `ai-coursework-lab` 系列中的第二个课程项目，展示了**多智能体编排范式**：用户的旅行请求被分解为并行的和顺序的子任务，每个子任务由专门的智能体（天气、交通、酒店、行程、预算、汇总器）处理。该系统与同一技术基础下的兄弟项目 `knowseeker/`（单智能体 RAG）共享 `common/` 模块（LLM 客户端、MCP 服务器、向量存储）。前端采用 Next.js 14 + React 18 + shadcn/ui（方案B），后端通过 FastAPI + SSE 流式推送进度；同时保留 Gradio 全栈方案（方案A，`app.py`）作为备选。
 
 ## 文件
 
-- **`app.py`** — Gradio 前端入口点（420 行）。定义了一个包含 3 个标签页的 `gr.Blocks` UI：
+- **`app.py`** — Gradio 前端入口点（方案A，770 行）。定义了一个包含 3 个标签页的 `gr.Blocks` UI：
   - **旅行规划 (Travel Planning)**：输入表单（目的地、天数、预算、出发地、偏好），`plan_btn` 触发 `plan_travel()`，后者通过 `run_travel_planner_stream()` 流式传输结果。展示智能体执行状态（`_format_agent_status()`）、通信日志、最终 Markdown 方案以及下载按钮。包含用于 UC-05 追问调整的**调整手风琴**（`handle_adjustment()`）。
   - **对话 (Chat)**：通过 `chat()` 使用 `llm.chat_completion()` 实现的简易聊天机器人，以 `list[dict]` 形式维护消息历史。
   - **设置 (Settings)**：LLM 后端配置（`deepseek`/`ollama`），包含 `update_settings()`、用于即时下拉切换的 `on_backend_change()`、用于异步获取模型列表的 `refresh_model_list()`，以及用于页面加载回显的 `get_config()`。
@@ -77,10 +77,10 @@ run_travel_planner_stream(request, progress)
     │     SummarizerAgent.safe_execute()  →  state["final_plan"] (Markdown)
     │
     ▼
-Gradio UI: final_plan (rendered Markdown) + agent_status + agent_logs + download button
+React UI: final_plan (rendered Markdown via react-markdown) + agent_status + download/copy buttons
 ```
 
-流中的每次 `yield` 都会实时更新 Gradio UI（Markdown 方案、智能体状态面板、通信日志、进度条）。
+流中的每次 `yield` 都通过 SSE 实时推送到 React 前端（Agent 状态面板、Markdown 方案）。Gradio 方案A中每次 yield 更新 Gradio UI。
 
 ## 集成点
 
@@ -94,4 +94,4 @@ Gradio UI: final_plan (rendered Markdown) + agent_status + agent_logs + download
   - `agents/base.py` — `BaseAgent` 类，包含 `call_mcp()`、`call_llm()`、`safe_execute()`、`add_log()`。
   - `agents/weather.py`、`agents/transport.py`、`agents/hotel.py`、`agents/itinerary.py`、`agents/budget.py`、`agents/summarizer.py` — 具体的智能体实例，以单例形式（`weather_agent`、`transport_agent` 等）在 `orchestrator.py` 中导入。
 
-- **被消费方**：Gradio 前端（`app.launch()` 监听 `0.0.0.0:7861`）。最终的 `final_plan`（Markdown）直接渲染在 UI 中，并可作为 `.md` 文件下载。
+- **被消费方**：React 前端（Next.js，`frontend/app/tripmind/page.tsx`，735 行）通过 SSE 调用 `run_travel_planner_stream`；Gradio 前端（`app.launch()` 监听 `0.0.0.0:7861`）为旧方案A。最终的 `final_plan`（Markdown）直接渲染在 UI 中，并可作为 `.md` / `.txt` 文件下载或复制。

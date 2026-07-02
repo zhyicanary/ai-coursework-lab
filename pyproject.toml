@@ -13,6 +13,7 @@ dependencies = [
     "langchain-community>=0.4.2",
     "langchain-openai>=1.3.2",
     "langgraph>=1.2.5",
+    "lxml>=6.1.1",
     "markdown>=3.10.2",
     "mcp>=1.28.0",
     "mcp-travel-smart-plan>=6.1.0",

@@ -43,10 +43,11 @@ export default function SettingsPage() {
                 const res = await fetch(`${API_BASE}/api/settings`);
                 if (res.ok) {
                     const data = await res.json();
-                    if (data.backend) setBackend(data.backend);
-                    if (data.model) setModel(data.model);
-                    if (data.api_key) setApiKey(data.api_key);
-                    if (data.base_url) setBaseUrl(data.base_url);
+                    const bk = data.backend || "deepseek";
+                    setBackend(bk);
+                    setModel(data.model || "");
+                    setApiKey(data.api_key || "");
+                    setBaseUrl(data.base_url || (bk === "ollama" ? "http://localhost:11434/v1" : "https://api.deepseek.com"));
                 }
             } catch {
                 // Backend not available, use defaults
@@ -54,6 +55,28 @@ export default function SettingsPage() {
         };
         load();
     }, []);
+
+    // When backend changes, reset model + baseUrl to defaults for that backend
+    useEffect(() => {
+        if (backend === "ollama") {
+            setBaseUrl((prev) =>
+                prev.includes("deepseek") ? "http://localhost:11434/v1" : prev
+            );
+            setModel((prev) =>
+                prev.includes("deepseek") ? "" : prev
+            );
+        } else {
+            setBaseUrl((prev) =>
+                prev.includes("localhost") || prev.includes("11434")
+                    ? "https://api.deepseek.com"
+                    : prev
+            );
+            setModel((prev) =>
+                prev && !prev.includes("deepseek") && !prev.includes("gpt") && !prev.includes("claude")
+                    ? "" : prev
+            );
+        }
+    }, [backend]);
 
     // Fetch models when mount or backend changes
     useEffect(() => {

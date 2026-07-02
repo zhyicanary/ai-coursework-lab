@@ -1,11 +1,12 @@
-"""MCP 旅游工具定义 — 三级降级：mcp-travel-smart-plan → 真实 API → 模拟数据。
+"""MCP 旅游工具定义 — 四级降级：12306-mcp → smart-plan → 真实 API → 模拟数据。
 
 每个工具都是异步函数，可从 MCP Server 注册，也可被 Agent 直接调用。
 
 数据源优先级：
-1. mcp-travel-smart-plan（飞猪/高德/同程/途牛，零配置，需 uvx）
-2. 自有 API Key（WEATHER_API_KEY / AMAP_API_KEY）
-3. 本地模拟数据（mock_data/，仅在 USE_MOCK=true 时启用）
+1. 12306-mcp（真实 12306 火车票数据，需 Node.js + ENABLE_12306_MCP=true）
+2. mcp-travel-smart-plan（飞猪/高德/同程/途牛，零配置，需 uvx）
+3. 自有 API Key（WEATHER_API_KEY / AMAP_API_KEY）
+4. 本地模拟数据（mock_data/，仅在 USE_MOCK=true 时启用）
 """
 
 import json
@@ -25,6 +26,8 @@ load_dotenv()
 USE_MOCK = os.getenv("USE_MOCK", "false").strip().lower() == "true"
 WEATHER_API_KEY = os.getenv("WEATHER_API_KEY", "").strip()
 AMAP_API_KEY = os.getenv("AMAP_API_KEY", "").strip()
+ENABLE_12306_MCP = os.getenv("ENABLE_12306_MCP", "false").strip().lower() == "true"
+MCP_12306_PORT = int(os.getenv("MCP_12306_PORT", "8080"))
 
 # mcp-travel-smart-plan（零配置，优先尝试）
 _HAVE_SMART_PLAN = False
@@ -478,6 +481,91 @@ def _get_mock_attractions(city: str, preferences: list[str] | None, top_k: int) 
 
 
 # ──────────────────────────────────────────────
+# 12306-mcp 数据源（外部 HTTP 服务，httpx 直调，不走 MCP 协议）
+# ──────────────────────────────────────────────
+#
+# 本系统只有一个 MCP 端点（Python FastMCP 8765）。
+# 12306-mcp 是 search_trains 的普通外部数据源，与和风天气 API 同级。
+# 用户手动启动: npx -y 12306-mcp --port 8080
+# .env 中 ENABLE_12306_MCP=true 后自动优先使用。
+
+_12306_MCP_URL = None
+
+
+async def _call_12306_mcp(tool_name: str, arguments: dict) -> list[dict] | None:
+    """通过 httpx + JSON-RPC 直接调用 12306-mcp HTTP API。"""
+    global _12306_MCP_URL
+    if _12306_MCP_URL is None:
+        _12306_MCP_URL = f"http://127.0.0.1:{MCP_12306_PORT}/mcp"
+
+    import httpx
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.post(
+                _12306_MCP_URL,
+                json={"jsonrpc": "2.0", "method": "tools/call",
+                      "params": {"name": tool_name, "arguments": arguments or {}}, "id": 1},
+                headers={"Content-Type": "application/json"},
+            )
+            if resp.status_code != 200:
+                return None
+            data = resp.json()
+            content = data.get("result", {}).get("content", [])
+            parsed = []
+            for item in content:
+                if item.get("type") == "text":
+                    try:
+                        parsed.append(json.loads(item["text"]))
+                    except (json.JSONDecodeError, TypeError):
+                        parsed.append(item["text"])
+            return parsed[0] if len(parsed) == 1 else (parsed or None)
+    except Exception:
+        return None
+
+
+def _normalize_12306_trains(raw: list[dict], departure: str, destination: str) -> list[dict]:
+    """将 12306-mcp 原始字段映射为系统统一格式。"""
+    if not isinstance(raw, list):
+        raw = [raw] if isinstance(raw, dict) else []
+    normalized = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        train_no = item.get("train_no", item.get("trainNo", ""))
+        dep_time = item.get("departure_time", item.get("departureTime", item.get("start_time", "")))
+        arr_time = item.get("arrival_time", item.get("arrivalTime", item.get("end_time", "")))
+        # 推断类型
+        prefix = train_no[0] if train_no else ""
+        type_map = {"G":"高铁","C":"城际","D":"动车","Z":"直达","T":"特快","K":"快速"}
+        normalized.append({
+            "train_no": train_no,
+            "departure_station": item.get("departure_station", item.get("from_station", departure)),
+            "arrival_station": item.get("arrival_station", item.get("to_station", destination)),
+            "departure_time": dep_time,
+            "arrival_time": arr_time,
+            "duration": item.get("duration", ""),
+            "price": item.get("price", 0),
+            "type": f"{type_map.get(prefix, '普快')}（12306）",
+            "source": "12306-mcp",
+        })
+    return normalized
+
+
+async def _search_trains_12306(departure: str, destination: str, date: str | None = None) -> list[dict] | None:
+    """从 12306-mcp 获取真实火车票数据。"""
+    args = {"from": departure, "to": destination}
+    if date:
+        args["date"] = date
+    raw = await _call_12306_mcp("search_tickets", args)
+    if raw is None:
+        return None
+    result = _normalize_12306_trains(raw, departure, destination)
+    if result:
+        _log_source("search_trains", "12306-mcp（真实12306数据）")
+    return result or None
+
+
+# ──────────────────────────────────────────────
 # 公开工具函数（Agent 和 MCP Server 调用入口）
 # ──────────────────────────────────────────────
 
@@ -569,7 +657,7 @@ async def search_trains(
 ) -> list[dict]:
     """查询高铁/火车信息。
 
-    数据源优先级：mcp-travel-smart-plan（飞猪） → 本地模拟数据
+    数据源优先级：12306-mcp → smart-plan（飞猪） → 本地模拟数据
 
     Args:
         departure: 出发城市
@@ -579,7 +667,13 @@ async def search_trains(
     Returns:
         列车列表 [{train_no, departure_station, arrival_station, departure_time, arrival_time, duration, price, type}]
     """
-    # 1. 优先尝试 smart-plan（飞猪数据，零配置）
+    # 1. 优先尝试 12306-mcp（真实 12306 火车票数据）
+    if ENABLE_12306_MCP:
+        trains = await _search_trains_12306(departure, destination, date)
+        if trains:
+            return trains
+
+    # 2. 尝试 smart-plan（飞猪数据，零配置）
     if _HAVE_SMART_PLAN:
         raw = await call_smart_plan("search_trains", {"departure": departure, "destination": destination})
         if raw:
@@ -623,7 +717,7 @@ async def search_trains(
                 _log_source("search_trains", "飞猪(smart-plan)")
                 return trains
 
-    # 2. 仅在 USE_MOCK 时回退到模拟数据
+    # 3. 仅在 USE_MOCK 时回退到模拟数据
     if not USE_MOCK:
         _log_source("search_trains", "无可用数据源")
         return []

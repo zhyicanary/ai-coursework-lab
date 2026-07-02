@@ -2,7 +2,7 @@
 
 ## 职责
 
-`common/` 是 KnowSeeker（单智能体 RAG 问答）和 TripMind（多智能体旅行规划器）的共享基础设施层。它提供三个以**全局单例**形式暴露的核心能力：一个可在运行时在 DeepSeek API 和本地 Ollama 之间热切换的 LLM 客户端（`LLMClient` / `llm`），一个由 Ollama 的 `qwen3-embedding:8b` 驱动的本地嵌入客户端（`EmbeddingClient` / `embedding`），以及一个带有模块级函数、支持两个独立集合命名空间（`"attractions"` 和 `"documents"`）的 ChromaDB 向量存储。此外，它还包含完整的 **MCP 协议层**——一个注册了 5 个旅行工具（航班、火车、酒店、天气、景点）的 FastMCP 服务器、一个可从 MCP stdio 无缝回退到直接函数调用的双路径客户端，以及涵盖 6 个中国城市的所有模拟 JSON 数据。
+`common/` 是 KnowSeeker（单智能体 RAG 问答）和 TripMind（多智能体旅行规划器）的共享基础设施层。它提供三个以**全局单例**形式暴露的核心能力：一个可在运行时在 DeepSeek API 和本地 Ollama 之间热切换的 LLM 客户端（`LLMClient` / `llm`），一个由 Ollama 的 `qwen3-embedding:8b` 驱动的本地嵌入客户端（`EmbeddingClient` / `embedding`），以及一个带有模块级函数、支持两个独立集合命名空间（`"attractions"` 和 `"documents"`）的 ChromaDB 向量存储。此外，它还包含完整的 **MCP 协议层**——一个注册了 5 个旅行工具（航班、火车、酒店、天气、景点）的 FastMCP 服务器、一个可从 MCP Streamable HTTP 无缝回退到直接函数调用的双路径客户端（含熔断机制，连续3次失败后永久降级），以及涵盖 6 个中国城市的所有模拟 JSON 数据。
 
 ## 文件说明
 
@@ -19,14 +19,14 @@
 - `mcp_server/__init__.py` — 空初始化文件。
 - `mcp_server/server.py` — 名为 `"TripMind Tools"` 的 **FastMCP** 服务器，通过 `register_tools()` 注册了 5 个异步工具：`search_flights`, `search_trains`, `search_hotels`, `get_weather`, `search_attractions`。入口点：`uv run python -m common.mcp_server.server`。
 - `mcp_server/tools.py` — 5 个工具的纯异步实现。从 `mock_data/` 读取模拟 JSON 数据。`CITY_NAME_MAP` 将中文城市名称映射为拼音文件名。`_load_json(filename)` 和 `_city_to_filename(city)` 是内部辅助函数。每个工具在没有匹配的模拟数据时都有回退默认值。
-- `mcp_server/client.py` — **`call_tool(name, arguments)`** — 带熔断缓存的统一 MCP 入口点。首次调用尝试 MCP stdio 子进程（`call_tool_via_mcp`）；成功时缓存 `_mcp_available = True`；失败时将 `_mcp_available` 设为 `False` 并永久回退到 `call_tool_direct`（直接调用 `tools.py` 函数）。使用 `mcp.client.stdio` 和 `ClientSession`。
+- `mcp_server/client.py` — **`call_tool(name, arguments)`** — 带熔断缓存的统一 MCP 入口点。优先通过 Streamable HTTP 连接常驻 MCP Server（`call_tool_via_http`，连接 `http://127.0.0.1:8765/mcp`）；成功时缓存 `_mcp_available = True`；`_MAX_HTTP_FAILS = 3` 次连续失败后将 `_mcp_available` 设为 `False` 并永久回退到 `call_tool_direct`（直接调用 `tools.py` 函数）。使用 `mcp.client.streamable_http` 和 `ClientSession`。
 - `mcp_server/init_attractions.py` — 一次性脚本（`uv run python -m common.mcp_server.init_attractions`），读取所有 `mock_data/attractions/*.json`，构建组合文本以供向量化，并通过 `vector_store.add_attractions()` 持久化嵌入向量。当 Ollama 离线时具有优雅降级——仅跳过 ChromaDB 导入。
 
 ## 设计模式
 
 - **单例模式**：`llm` (LLMClient)、`embedding` (EmbeddingClient)、ChromaDB `client` (PersistentClient)、MCP `mcp_server` (FastMCP) 和 `_mcp_available`（模块级布尔值）均为全局单例——无依赖注入，模块直接导入并使用。
 - **策略/热切换模式**：`LLMClient` 通过 `update()` 在运行时在 `"deepseek"` 和 `"ollama"` 后端之间切换，同时将选择持久化到 `.env`，使切换在重启后仍然生效。
-- **熔断/故障转移模式**：`mcp_server/client.py:call_tool()` 将 MCP 可用性分为三态（`None` → 未尝试，`True` → 可用，`False` → 不可用）。首次失败后，它会永久标记 MCP 为不可用，并在进程剩余生命周期内切换到直接调用 `tools.py`。
+- **熔断/故障转移模式**：`mcp_server/client.py:call_tool()` 将 MCP 可用性分为三态（`None` → 未尝试，`True` → HTTP 可用，`False` → 不可用）。连续 `_MAX_HTTP_FAILS = 3` 次 HTTP 调用失败后永久标记为不可用，切换到直接调用 `tools.py`。在未达阈值前，每次失败后本次调用回退到直接调用但保持下次重试 HTTP。
 - **模块级函数式 API**：`vector_store.py` 暴露裸函数而非类——使 KnowSeeker（文档搜索）和 TripMind（景点搜索）都能更简单地按需导入。
 
 ## 数据与控制流
@@ -57,7 +57,7 @@
     ┌────────────────────────────┼────────────────────────────┐
     │                            │                            │
     │                    tripmind/ 应用                        │
-    │              (Gradio 多智能体)                           │
+     │              (TripMind 多智能体)                         │
     │              智能体通过以下方式调用：                     │
     │              BaseAgent.call_mcp() → client.call_tool()  │
     │              BaseAgent.call_llm() → llm.chat_completion │
@@ -69,16 +69,16 @@
                     │  call_tool()             │
                     │  ┌───────────────────┐   │
                     │  │ _mcp_available?   │   │
-                    │  │  True  → MCP stdio│   │
-                    │  │  False → 直接调用   │   │
+                     │  │  True  → HTTP     │   │
+                     │  │  False → 直接调用   │   │
                     │  └───────────────────┘   │
                     └────────┬────────────────┘
                              │
                   ┌──────────┴──────────┐
                   ▼                     ▼
-    ┌─────────────────────┐  ┌───────────────────────┐
-    │ MCP stdio 子进程     │  │ 直接函数调用            │
-    │ FastMCP 服务器       │  │ tools.py               │
+     ┌─────────────────────┐  ┌───────────────────────┐
+     │ MCP HTTP Server      │  │ 直接函数调用            │
+     │ (常驻进程, 端口8765)  │  │ tools.py               │
     │ server.py            │  │ search_flights/        │
     │ 工具分发器            │  │ search_trains/         │
     └──────────┬──────────┘  │ search_hotels/          │

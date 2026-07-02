@@ -121,6 +121,7 @@ export default function TripMindPage() {
     const [adjustInput, setAdjustInput] = useState("");
     const [adjustLoading, setAdjustLoading] = useState(false);
     const [adjustResult, setAdjustResult] = useState<string | null>(null);
+    const [adjustAgents, setAdjustAgents] = useState<string[]>([]);  // 调整涉及的 Agent
     const [error, setError] = useState<string | null>(null);
     const [downloading, setDownloading] = useState(false);
     const [copied, setCopied] = useState(false);
@@ -149,7 +150,7 @@ export default function TripMindPage() {
         if (planResult) {
             localStorage.setItem(
                 STORAGE_KEY,
-                JSON.stringify({ planResult, adjustResult, lastState }),
+                JSON.stringify({ planResult, adjustResult, lastState, adjustAgents }),
             );
         }
     }, [planResult, adjustResult, lastState]);
@@ -158,6 +159,36 @@ export default function TripMindPage() {
         setPreferences((prev) =>
             prev.includes(key) ? prev.filter((p) => p !== key) : [...prev, key],
         );
+    };
+
+    // 根据调整指令推断受影响的 Agent（与后端 _parse_adjustment 逻辑一致）
+    const inferAffectedAgents = (instruction: string): string[] => {
+        const kw = instruction.toLowerCase();
+        const agents = new Set<string>();
+        const patterns: [string[], string[]][] = [
+            [["酒店", "住宿", "民宿", "旅馆", "住"], ["hotel"]],
+            [["预算", "加钱", "省钱", "便宜", "涨价", "降价", "提高预算", "增加预算", "减少预算", "节省"], ["hotel", "budget"]],
+            [["行程", "景点", "想去", "玩", "参观", "游览", "偏好", "美食", "文化", "自然", "喜欢"], ["itinerary"]],
+            [["交通", "飞机", "高铁", "动车", "航班", "火车", "打车", "自驾"], ["transport"]],
+            [["天气"], ["weather"]],
+            [["天数", "延长", "缩短", "增加一天", "减少一天", "多一天", "少一天"], ["weather", "hotel", "itinerary"]],
+            [["目的地", "城市", "换个", "改到", "改成", "去", "换个地方"], ["weather", "transport", "hotel", "itinerary"]],
+        ];
+        for (const [keywords, keys] of patterns) {
+            if (keywords.some((k) => kw.includes(k))) {
+                keys.forEach((k) => agents.add(k));
+            }
+        }
+        // 任何变更都重算 budget + summarizer（除纯天气外）
+        if (agents.size > 0 && !(agents.size === 1 && agents.has("weather"))) {
+            agents.add("budget");
+        }
+        // 默认至少重算行程+预算
+        if (agents.size === 0) {
+            agents.add("itinerary");
+            agents.add("budget");
+        }
+        return Array.from(agents);
     };
 
     const handlePlan = async () => {
@@ -272,6 +303,15 @@ export default function TripMindPage() {
         setAdjustLoading(true);
         setError(null);
 
+        // 推断可能受影响的 Agent 并显示
+        const guessedAgents = inferAffectedAgents(text);
+        setAdjustAgents(guessedAgents);
+        setAgentStatuses((prev) =>
+            prev.map((a) =>
+                guessedAgents.includes(a.name) ? { ...a, status: "running" } : a,
+            ),
+        );
+
         try {
             const res = await fetch(`${API_BASE}/api/travel/adjust`, {
                 method: "POST",
@@ -289,11 +329,28 @@ export default function TripMindPage() {
             if (newPlan) {
                 setPlanResult(newPlan);
                 setLastState(data);
+                // 标记受影响的 Agent 为完成
+                setAgentStatuses((prev) =>
+                    prev.map((a) =>
+                        guessedAgents.includes(a.name) ? { ...a, status: "done" } : a,
+                    ),
+                );
+                // 3 秒后恢复待命状态
+                setTimeout(() => {
+                    setAgentStatuses(prev =>
+                        prev.map(a => a.status === "done" ? { ...a, status: "pending" } : a)
+                    );
+                    setAdjustAgents([]);
+                }, 3000);
             }
-            const adjustMsg = newPlan ? "方案已更新" : "调整完成";
-            setAdjustResult(adjustMsg);
+            setAdjustResult(text);  // 记录调整指令用于下载报告
         } catch (err) {
             setError(err instanceof Error ? err.message : "调整请求失败");
+            setAgentStatuses((prev) =>
+                prev.map((a) =>
+                    guessedAgents.includes(a.name) ? { ...a, status: "error" } : a,
+                ),
+            );
         } finally {
             setAdjustLoading(false);
         }
@@ -317,7 +374,7 @@ export default function TripMindPage() {
             planResult || "（无方案数据）",
         ];
         if (adjustResult) {
-            lines.push(``, `---`, `## 🔄 调整记录`, ``, adjustResult);
+            lines.push(``, `---`, `## 🔄 调整记录`, ``, `> ${adjustResult}`, ``);
         }
         return lines.join("\n");
     }, [
@@ -545,8 +602,8 @@ export default function TripMindPage() {
                         </div>
                     )}
 
-                    {/* Agent Status Panel */}
-                    {planning && (
+                    {/* Agent Status Panel — 规划或调整时显示 */}
+                    {(planning || adjustLoading) && (
                         <Card>
                             <CardHeader>
                                 <CardTitle className="text-lg">
@@ -612,9 +669,17 @@ export default function TripMindPage() {
                         <Card ref={resultRef}>
                             <CardHeader>
                                 <div className="flex items-center justify-between">
-                                    <CardTitle className="text-lg">
-                                        📋 旅行方案
-                                    </CardTitle>
+                                    <div className="flex items-center gap-2">
+                                        <CardTitle className="text-lg">
+                                            📋 旅行方案
+                                        </CardTitle>
+                                        {adjustResult && (
+                                            <Badge variant="outline" className="gap-1 text-xs">
+                                                <RefreshCw className="h-3 w-3" />
+                                                已调整: {adjustResult}
+                                            </Badge>
+                                        )}
+                                    </div>
                                     <div className="flex gap-2">
                                         <Button
                                             variant="outline"
@@ -659,24 +724,6 @@ export default function TripMindPage() {
                                 <div className="prose prose-sm dark:prose-invert max-w-none">
                                     <ReactMarkdown remarkPlugins={[remarkGfm]}>
                                         {planResult}
-                                    </ReactMarkdown>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    )}
-
-                    {/* Adjustment Result */}
-                    {adjustResult && (
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="text-lg">
-                                    🔄 调整结果
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="prose prose-sm dark:prose-invert max-w-none">
-                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                        {adjustResult}
                                     </ReactMarkdown>
                                 </div>
                             </CardContent>
