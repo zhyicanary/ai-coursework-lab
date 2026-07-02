@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { toast } from "sonner"
@@ -179,6 +179,7 @@ export default function TripMindPage() {
   const [preferences, setPreferences] = useState<string[]>([])
 
   const [planResult, setPlanResult] = useState<string | null>(null)
+  const planResultRef = useRef<string | null>(null)
   const [agentStatuses, setAgentStatuses] = useState<AgentState[]>([])
   const [planning, setPlanning] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -247,6 +248,7 @@ export default function TripMindPage() {
     }
 
     if ("final_plan" in data && typeof data.final_plan === "string") {
+      planResultRef.current = data.final_plan
       setPlanResult(data.final_plan)
     }
     if ("__full_state__" in data && data.__full_state__) {
@@ -312,15 +314,29 @@ export default function TripMindPage() {
         }
       }
 
-      // Safety net: mark any still-running/pending agent as done.
-      setAgentStatuses((prev) =>
-        prev.map((a) =>
-          a.status === "running" || a.status === "pending"
-            ? { ...a, status: "done" as AgentStatus }
-            : a
+      // Safety net: only mark as done if we received final_plan.
+      // Otherwise the stream ended unexpectedly — mark as error.
+      const gotFinalPlan = planResultRef.current !== null
+      if (gotFinalPlan) {
+        setAgentStatuses((prev) =>
+          prev.map((a) =>
+            a.status === "running" || a.status === "pending"
+              ? { ...a, status: "done" as AgentStatus }
+              : a
+          )
         )
-      )
-      toast.success("行程规划完成！")
+        toast.success("行程规划完成！")
+      } else {
+        setAgentStatuses((prev) =>
+          prev.map((a) =>
+            a.status === "running" || a.status === "pending"
+              ? { ...a, status: "error" as AgentStatus }
+              : a
+          )
+        )
+        setError("流式连接异常结束，部分 Agent 未完成")
+        toast.error("规划未完成 — 部分智能体执行失败")
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "规划失败，请稍后重试"
       setError(msg)

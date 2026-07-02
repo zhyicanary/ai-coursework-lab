@@ -238,27 +238,80 @@ def _report_progress(progress, node_name: str):
 
 
 async def run_travel_planner_stream(request: TravelRequest, progress=None):
-    """运行旅游规划器（逐节点流式返回中间状态）。
+    """运行旅游规划器（逐 Agent 流式返回中间状态）。
 
-    使用 graph.astream 替代 ainvoke，每次 yield 一个 Agent 节点的
-    完整 state 快照。配合 Gradio 生成器实现前端实时进度。
+    不使用 graph.astream（按节点 yield），改为手动编排，
+    每个 Agent 完成后立即 yield，让前端实时更新单个 Agent 状态。
 
-    Args:
-        request: 用户旅行需求
-        progress: gr.Progress() 实例（可选），自动更新进度条
-
-    Yields:
-        每个节点完成后的 TravelState 快照
+    DAG 依赖：
+      并行层: weather, transport, hotel（无依赖，可并行）
+      规划层: itinerary（依赖 weather+transport）→ budget（依赖 transport+hotel+itinerary）
+      汇总层: summarizer（依赖全部）
     """
-    graph = build_travel_graph()
-    initial_state = _build_initial_state(request)
+    state = _build_initial_state(request)
 
-    async for step in graph.astream(initial_state):
-        # step 格式: {node_name: node_output_dict}
-        for node_name, node_output in step.items():
-            if isinstance(node_output, dict):
-                _report_progress(progress, node_name)
-                yield node_output
+    # ── 1. 并行层：weather, transport, hotel ──
+    _report_progress(progress, "parallel")
+
+    # 每个 Agent 对应的 result key
+    parallel_specs = [
+        ("weather", "weather_result"),
+        ("transport", "transport_result"),
+        ("hotel", "hotel_result"),
+    ]
+
+    # 创建并行任务
+    tasks = {
+        key: asyncio.create_task(AGENTS[name].safe_execute(_copy_state(state)))
+        for name, key in parallel_specs
+    }
+
+    # 逐个等待完成（哪个先完成就先 yield）
+    remaining = dict(tasks)
+    while remaining:
+        done_keys = []
+        for key, task in remaining.items():
+            if task.done():
+                done_keys.append(key)
+        if not done_keys:
+            # 没有完成的，等最快的一个
+            await asyncio.wait(remaining.values(), return_when=asyncio.FIRST_COMPLETED)
+            for key, task in remaining.items():
+                if task.done():
+                    done_keys.append(key)
+
+        for key in done_keys:
+            result = remaining[key].result()
+            if result.get(key) is not None:
+                state[key] = result[key]
+                yield {key: result[key]}
+            del remaining[key]
+
+    # ── 2. 规划层：itinerary → budget（顺序）──
+    _report_progress(progress, "planning")
+
+    it_state = await AGENTS["itinerary"].safe_execute(_copy_state(state))
+    if it_state.get("itinerary_result") is not None:
+        state["itinerary_result"] = it_state["itinerary_result"]
+        yield {"itinerary_result": it_state["itinerary_result"]}
+
+    bd_state = await AGENTS["budget"].safe_execute(_copy_state(state))
+    if bd_state.get("budget_result") is not None:
+        state["budget_result"] = bd_state["budget_result"]
+        yield {"budget_result": bd_state["budget_result"]}
+
+    # ── 3. 预算检查 ──
+    budget_result = state.get("budget_result", {})
+    if budget_result and budget_result.get("is_over_budget", False):
+        _report_progress(progress, "budget_adjust")
+        state["budget_adjusted"] = True
+
+    # ── 4. 汇总层：summarizer ──
+    _report_progress(progress, "summarizer")
+    sm_state = await AGENTS["summarizer"].safe_execute(_copy_state(state))
+    if sm_state.get("final_plan") is not None:
+        state["final_plan"] = sm_state["final_plan"]
+        yield {"final_plan": sm_state["final_plan"]}
 
 
 # ─── 追问调整（UC-05）───────────────────────────────────
