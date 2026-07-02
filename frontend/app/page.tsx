@@ -1,97 +1,240 @@
 import Link from "next/link";
-import { Search, Plane, ArrowRight, Brain } from "lucide-react";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import {
+    Search,
+    Plane,
+    ArrowRight,
+    Brain,
+    Sparkles,
+    Layers,
+    Zap,
+    Bot,
+} from "lucide-react";
+import {
+    Card,
+    CardHeader,
+    CardTitle,
+    CardDescription,
+    CardContent,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
+const techStack = [
+    { label: "LangGraph", icon: Layers },
+    { label: "MCP", icon: Zap },
+    { label: "DeepSeek", icon: Brain },
+    { label: "ChromaDB", icon: Sparkles },
+];
+
 export default function HomePage() {
-  return (
-    <div className="flex flex-col items-center justify-center min-h-[calc(100vh-4rem)] p-4 md:p-8">
-      <div className="max-w-4xl w-full space-y-10">
-        {/* Hero */}
-        <div className="text-center space-y-4">
-          <div className="flex items-center justify-center gap-2">
-            <Brain className="h-10 w-10 text-primary" />
-            <h1 className="text-4xl font-bold tracking-tight">AI Coursework Lab</h1>
-          </div>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            基于统一技术底座的智能应用系统设计课设作品集。
-            探索两种不同的 AI Agent 范式，体验智能知识问答与多 Agent 协同规划。
-          </p>
+    return (
+        <div className="flex flex-col min-h-[calc(100vh-3.5rem)]">
+            {/* Hero Section */}
+            <section className="relative overflow-hidden border-b">
+                {/* Gradient background */}
+                <div className="absolute inset-0 bg-gradient-to-br from-violet-50 via-blue-50 to-cyan-50 dark:from-violet-950/30 dark:via-blue-950/20 dark:to-transparent" />
+                <div
+                    className="absolute inset-0 opacity-30 dark:opacity-20"
+                    style={{
+                        backgroundImage:
+                            "radial-gradient(circle at 20% 50%, rgba(120, 119, 198, 0.15), transparent 50%), radial-gradient(circle at 80% 80%, rgba(255, 119, 198, 0.1), transparent 50%)",
+                    }}
+                />
+
+                <div className="relative mx-auto max-w-4xl px-4 py-16 md:py-24 text-center">
+                    <div className="mb-6 flex justify-center animate-fade-in">
+                        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-blue-500 shadow-lg shadow-violet-500/25">
+                            <Brain className="h-8 w-8 text-white" />
+                        </div>
+                    </div>
+
+                    <h1 className="text-4xl font-bold tracking-tight md:text-5xl animate-fade-in-up">
+                        AI Coursework{" "}
+                        <span className="text-gradient">Lab</span>
+                    </h1>
+
+                    <p className="mx-auto mt-4 max-w-2xl text-base text-muted-foreground md:text-lg animate-fade-in-up">
+                        基于统一技术底座（大模型 + LangGraph + MCP），
+                        探索两种 AI Agent 应用范式 —
+                        深度推理与协同编排。
+                    </p>
+
+                    <div className="mt-8 flex flex-wrap justify-center gap-2 animate-fade-in">
+                        {techStack.map((tech) => {
+                            const Icon = tech.icon;
+                            return (
+                                <Badge
+                                    key={tech.label}
+                                    variant="secondary"
+                                    className="gap-1.5 px-3 py-1 text-sm"
+                                >
+                                    <Icon className="h-3.5 w-3.5" />
+                                    {tech.label}
+                                </Badge>
+                            );
+                        })}
+                    </div>
+                </div>
+            </section>
+
+            {/* Project Cards */}
+            <section className="mx-auto w-full max-w-4xl px-4 py-12 md:py-16">
+                <div className="grid gap-6 md:grid-cols-2">
+                    {/* KnowSeeker Card */}
+                    <Link
+                        href="/knowseeker"
+                        className="group animate-fade-in-up"
+                        style={{ animationDelay: "0.1s" }}
+                    >
+                        <Card className="gradient-border glow-on-hover h-full overflow-hidden border-2 transition-all hover:-translate-y-1">
+                            <CardHeader className="pb-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500/15 to-blue-500/15 ring-1 ring-violet-500/20">
+                                        <Search className="h-5 w-5 text-violet-600 dark:text-violet-400" />
+                                    </div>
+                                    <div>
+                                        <CardTitle className="text-xl">
+                                            KnowSeeker
+                                        </CardTitle>
+                                        <CardDescription>
+                                            Agentic RAG 知识助手
+                                        </CardDescription>
+                                    </div>
+                                </div>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <p className="text-sm text-muted-foreground leading-relaxed">
+                                    单 Agent 深度推理 — 上传文档构建知识库，
+                                    AI 自主分析问题并制定多轮检索策略，
+                                    生成带引用的精准回答。
+                                </p>
+                                <div className="flex flex-wrap gap-1.5">
+                                    <Badge variant="outline" className="text-xs">
+                                        Agentic RAG
+                                    </Badge>
+                                    <Badge variant="outline" className="text-xs">
+                                        向量检索
+                                    </Badge>
+                                    <Badge variant="outline" className="text-xs">
+                                        思维链
+                                    </Badge>
+                                    <Badge variant="outline" className="text-xs">
+                                        引用溯源
+                                    </Badge>
+                                </div>
+                                <div className="flex items-center gap-1.5 text-sm font-medium text-violet-600 dark:text-violet-400">
+                                    开始使用
+                                    <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </Link>
+
+                    {/* TripMind Card */}
+                    <Link
+                        href="/tripmind"
+                        className="group animate-fade-in-up"
+                        style={{ animationDelay: "0.2s" }}
+                    >
+                        <Card className="gradient-border glow-on-hover h-full overflow-hidden border-2 transition-all hover:-translate-y-1">
+                            <CardHeader className="pb-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500/15 to-teal-500/15 ring-1 ring-cyan-500/20">
+                                        <Plane className="h-5 w-5 text-cyan-600 dark:text-cyan-400" />
+                                    </div>
+                                    <div>
+                                        <CardTitle className="text-xl">
+                                            TripMind
+                                        </CardTitle>
+                                        <CardDescription>
+                                            多 Agent 旅游规划
+                                        </CardDescription>
+                                    </div>
+                                </div>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <p className="text-sm text-muted-foreground leading-relaxed">
+                                    多 Agent 协同编排 — 6 个专业 Agent
+                                    并行协作，实时生成包含天气、交通、
+                                    住宿、行程和预算的完整旅行方案。
+                                </p>
+                                <div className="flex flex-wrap gap-1.5">
+                                    <Badge variant="outline" className="text-xs">
+                                        Multi-Agent
+                                    </Badge>
+                                    <Badge variant="outline" className="text-xs">
+                                        MCP 协议
+                                    </Badge>
+                                    <Badge variant="outline" className="text-xs">
+                                        SSE 流式
+                                    </Badge>
+                                    <Badge variant="outline" className="text-xs">
+                                        追问调整
+                                    </Badge>
+                                </div>
+                                <div className="flex items-center gap-1.5 text-sm font-medium text-cyan-600 dark:text-cyan-400">
+                                    开始规划
+                                    <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </Link>
+                </div>
+
+                {/* Feature Highlights */}
+                <div className="mt-12 grid gap-4 md:grid-cols-3">
+                    {[
+                        {
+                            icon: Bot,
+                            title: "自主决策",
+                            desc: "Agent 自主判断检索轮次和策略",
+                        },
+                        {
+                            icon: Layers,
+                            title: "MCP 协议",
+                            desc: "标准化工具调用 + 熔断降级机制",
+                        },
+                        {
+                            icon: Zap,
+                            title: "并行编排",
+                            desc: "DAG 依赖调度，独立任务并行执行",
+                        },
+                    ].map((feat) => {
+                        const Icon = feat.icon;
+                        return (
+                            <div
+                                key={feat.title}
+                                className="flex items-start gap-3 rounded-lg border p-4"
+                            >
+                                <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
+                                    <Icon className="h-4 w-4 text-muted-foreground" />
+                                </div>
+                                <div>
+                                    <p className="text-sm font-medium">
+                                        {feat.title}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                        {feat.desc}
+                                    </p>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            </section>
+
+            {/* Footer */}
+            <footer className="mt-auto border-t">
+                <div className="mx-auto max-w-4xl px-4 py-6 text-center">
+                    <p className="text-xs text-muted-foreground">
+                        Powered by DeepSeek API + Ollama Embedding + ChromaDB +
+                        MCP Protocol
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                        智能应用系统设计 — 课程设计作品集 © 2026
+                    </p>
+                </div>
+            </footer>
         </div>
-
-        {/* Cards */}
-        <div className="grid gap-6 md:grid-cols-2">
-          {/* KnowSeeker Card */}
-          <Card className="group relative overflow-hidden border-2 transition-all hover:border-primary/50 hover:shadow-lg">
-            <CardHeader className="pb-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                  <Search className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <CardTitle className="text-xl">KnowSeeker</CardTitle>
-                  <CardDescription>Agentic RAG 知识助手</CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                单 Agent 深度推理 — 上传文档构建知识库，
-                AI 自主分析问题并制定多轮检索策略，生成带引用的精准回答。
-              </p>
-              <div className="flex flex-wrap gap-2">
-                <Badge variant="secondary">Agentic RAG</Badge>
-                <Badge variant="secondary">向量检索</Badge>
-                <Badge variant="secondary">思维链</Badge>
-                <Badge variant="secondary">引用溯源</Badge>
-              </div>
-              <Link href="/knowseeker">
-                <Button className="w-full mt-2 gap-2">
-                  开始使用 <ArrowRight className="h-4 w-4" />
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
-
-          {/* TripMind Card */}
-          <Card className="group relative overflow-hidden border-2 transition-all hover:border-primary/50 hover:shadow-lg">
-            <CardHeader className="pb-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                  <Plane className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <CardTitle className="text-xl">TripMind</CardTitle>
-                  <CardDescription>多 Agent 旅游规划</CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                多 Agent 协同编排 — 6 个专业 Agent 并行协作，
-                实时生成包含天气、交通、住宿、行程和预算的完整旅行方案。
-              </p>
-              <div className="flex flex-wrap gap-2">
-                <Badge variant="secondary">Multi-Agent</Badge>
-                <Badge variant="secondary">MCP 协议</Badge>
-                <Badge variant="secondary">SSE 流式</Badge>
-                <Badge variant="secondary">追问调整</Badge>
-              </div>
-              <Link href="/tripmind">
-                <Button className="w-full mt-2 gap-2">
-                  开始规划 <ArrowRight className="h-4 w-4" />
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Footer info */}
-        <p className="text-center text-xs text-muted-foreground">
-          Powered by DeepSeek API + Ollama Embedding + ChromaDB + MCP Protocol
-        </p>
-      </div>
-    </div>
-  );
+    );
 }

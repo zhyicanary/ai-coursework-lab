@@ -11,6 +11,9 @@ import {
     Brain,
     ChevronDown,
     ChevronUp,
+    Sparkles,
+    Bot,
+    User,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,10 +39,13 @@ interface ChatMessage {
     citations?: { doc_name: string; content?: string }[];
 }
 
-interface AgentState {
-    thinking_trace: { step: string; content: string; detail?: string }[];
-    citations: { doc_name: string; content?: string }[];
-}
+const iconMap: Record<string, { icon: string; color: string }> = {
+    analyze: { icon: "📋", color: "text-blue-500" },
+    retrieve: { icon: "🔍", color: "text-violet-500" },
+    evaluate: { icon: "📊", color: "text-amber-500" },
+    reformulate: { icon: "🔄", color: "text-cyan-500" },
+    generate: { icon: "📝", color: "text-green-500" },
+};
 
 export default function KnowSeekerPage() {
     const [documents, setDocuments] = useState<Document[]>([]);
@@ -152,7 +158,7 @@ export default function KnowSeekerPage() {
         } catch (err) {
             const errorMsg: ChatMessage = {
                 role: "assistant",
-                content: `❌ 请求失败：${err instanceof Error ? err.message : "未知错误"}`,
+                content: `请求失败：${err instanceof Error ? err.message : "未知错误"}`,
             };
             setMessages((prev) => [...prev, errorMsg]);
         } finally {
@@ -171,26 +177,21 @@ export default function KnowSeekerPage() {
         setExpandedThinking((prev) => ({ ...prev, [idx]: !prev[idx] }));
     };
 
-    const iconMap: Record<string, string> = {
-        analyze: "📋",
-        retrieve: "🔍",
-        evaluate: "📊",
-        reformulate: "🔄",
-        generate: "📝",
-    };
-
     return (
-        <div className="flex h-full">
+        <div className="flex h-[calc(100vh-3.5rem)]">
             {/* Left Sidebar - Document Management */}
-            <aside className="hidden lg:flex w-72 flex-col border-r bg-sidebar-background">
+            <aside className="hidden lg:flex w-72 flex-col border-r bg-sidebar-background/50 backdrop-blur-sm">
                 <div className="p-4 border-b">
                     <h2 className="text-sm font-semibold flex items-center gap-2">
-                        <FileText className="h-4 w-4" />
-                        文档管理
+                        <FileText className="h-4 w-4 text-primary" />
+                        知识库文档
                     </h2>
+                    <p className="text-xs text-muted-foreground mt-1">
+                        上传文档以构建 RAG 知识库
+                    </p>
                 </div>
 
-                <div className="p-4">
+                <div className="p-3">
                     <input
                         ref={fileInputRef}
                         type="file"
@@ -200,7 +201,7 @@ export default function KnowSeekerPage() {
                     />
                     <Button
                         variant="outline"
-                        className="w-full gap-2"
+                        className="w-full gap-2 border-dashed"
                         onClick={() => fileInputRef.current?.click()}
                         disabled={uploading}
                     >
@@ -211,40 +212,51 @@ export default function KnowSeekerPage() {
                         )}
                         {uploading ? "上传中..." : "上传文档"}
                     </Button>
-                    <p className="text-xs text-muted-foreground mt-2">
-                        支持 PDF, TXT, Markdown, DOCX 等格式
+                    <p className="text-xs text-muted-foreground mt-2 text-center">
+                        支持 PDF, TXT, MD, DOCX
                     </p>
                 </div>
 
                 <Separator />
 
-                <ScrollArea className="flex-1 p-4">
+                <ScrollArea className="flex-1 px-3 pb-3">
                     {documents.length === 0 ? (
-                        <p className="text-sm text-muted-foreground text-center py-8">
-                            暂无文档，请上传
-                        </p>
+                        <div className="flex flex-col items-center justify-center py-12 text-center">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted mb-3">
+                                <FileText className="h-5 w-5 text-muted-foreground" />
+                            </div>
+                            <p className="text-sm text-muted-foreground">
+                                暂无文档
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                                上传后即可开始提问
+                            </p>
+                        </div>
                     ) : (
-                        <div className="space-y-2">
+                        <div className="space-y-2 pt-2">
                             {documents.map((doc) => (
                                 <div
                                     key={doc.id || doc.doc_id}
-                                    className="flex items-start justify-between rounded-md border p-3 text-sm"
+                                    className="group flex items-start justify-between rounded-lg border bg-card p-3 text-sm transition-colors hover:bg-accent/50"
                                 >
-                                    <div className="flex-1 min-w-0">
-                                        <p className="font-medium truncate">
-                                            {doc.file_name}
-                                        </p>
-                                        <p className="text-xs text-muted-foreground">
-                                            {doc.chunks_count} 个片段
-                                        </p>
+                                    <div className="flex items-start gap-2 min-w-0 flex-1">
+                                        <FileText className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                                        <div className="min-w-0">
+                                            <p className="font-medium truncate text-sm">
+                                                {doc.file_name}
+                                            </p>
+                                            <p className="text-xs text-muted-foreground">
+                                                {doc.chunks_count} 个片段
+                                            </p>
+                                        </div>
                                     </div>
                                     <Button
                                         variant="ghost"
                                         size="icon"
-                                        className="h-7 w-7 text-muted-foreground hover:text-destructive shrink-0"
+                                        className="h-7 w-7 text-muted-foreground hover:text-destructive shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
                                         onClick={() => handleDelete(doc.doc_id)}
                                     >
-                                        <Trash2 className="h-4 w-4" />
+                                        <Trash2 className="h-3.5 w-3.5" />
                                     </Button>
                                 </div>
                             ))}
@@ -256,58 +268,71 @@ export default function KnowSeekerPage() {
             {/* Main Chat Area */}
             <div className="flex flex-1 flex-col">
                 {/* Header */}
-                <div className="flex items-center gap-2 border-b px-4 py-3">
-                    <Brain className="h-5 w-5 text-primary" />
+                <div className="flex items-center gap-2 border-b px-4 py-3 bg-background/80 backdrop-blur-sm">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500/15 to-blue-500/15 ring-1 ring-violet-500/20">
+                        <Brain className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+                    </div>
                     <h1 className="text-lg font-semibold">KnowSeeker</h1>
-                    <Badge variant="secondary" className="ml-2 text-xs">
+                    <Badge variant="secondary" className="ml-1 text-xs gap-1">
+                        <Sparkles className="h-3 w-3" />
                         Agentic RAG
                     </Badge>
                 </div>
 
                 {/* Chat Messages */}
-                <ScrollArea className="flex-1 px-4">
+                <ScrollArea className="flex-1 scrollbar-thin">
                     {messages.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center h-full text-center py-16">
-                            <Search className="h-12 w-12 text-muted-foreground mb-4" />
+                        <div className="flex flex-col items-center justify-center h-full text-center py-16 px-4">
+                            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500/10 to-blue-500/10 ring-1 ring-violet-500/15 mb-4">
+                                <Search className="h-8 w-8 text-violet-500/70" />
+                            </div>
                             <h2 className="text-xl font-semibold mb-2">
                                 Agentic RAG 知识助手
                             </h2>
-                            <p className="text-muted-foreground max-w-md">
+                            <p className="text-muted-foreground max-w-md text-sm leading-relaxed">
                                 上传文档后即可开始提问。AI Agent
-                                会自主分析问题、 制定检索策略并生成精准回答。
+                                会自主分析问题、制定检索策略并生成精准回答，
+                                支持多轮检索和引用溯源。
                             </p>
                         </div>
                     ) : (
-                        <div className="space-y-6 py-4">
+                        <div className="space-y-6 py-4 px-4 max-w-3xl mx-auto">
                             {messages.map((msg, idx) => (
                                 <div
                                     key={idx}
                                     className={cn(
-                                        "flex gap-3",
+                                        "flex gap-3 animate-fade-in-up",
                                         msg.role === "user"
                                             ? "justify-end"
                                             : "justify-start",
                                     )}
                                 >
+                                    {/* Avatar */}
+                                    {msg.role === "assistant" && (
+                                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-blue-500 text-white">
+                                            <Bot className="h-4 w-4" />
+                                        </div>
+                                    )}
+
                                     <div
                                         className={cn(
-                                            "max-w-[80%] rounded-lg px-4 py-3",
+                                            "max-w-[80%] rounded-2xl px-4 py-3",
                                             msg.role === "user"
-                                                ? "bg-primary text-primary-foreground"
-                                                : "bg-muted",
+                                                ? "bg-primary text-primary-foreground rounded-br-md"
+                                                : "bg-muted rounded-bl-md",
                                         )}
                                     >
-                                        <div className="text-sm whitespace-pre-wrap">
+                                        <div className="text-sm whitespace-pre-wrap leading-relaxed">
                                             {msg.content}
                                         </div>
 
-                                        {/* Thinking Process */}
+                                        {/* Thinking Process - Timeline */}
                                         {msg.role === "assistant" &&
                                             msg.thinking_trace &&
                                             msg.thinking_trace.length > 0 && (
                                                 <div className="mt-3 border-t pt-3">
                                                     <button
-                                                        className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+                                                        className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
                                                         onClick={() =>
                                                             toggleThinking(idx)
                                                         }
@@ -319,35 +344,73 @@ export default function KnowSeekerPage() {
                                                         ) : (
                                                             <ChevronDown className="h-3 w-3" />
                                                         )}
-                                                        🧠 思考过程
+                                                        <Brain className="h-3 w-3" />
+                                                        思考过程 ({
+                                                            msg.thinking_trace
+                                                                .length
+                                                        }{" "}
+                                                        步)
                                                     </button>
                                                     {expandedThinking[idx] && (
-                                                        <div className="mt-2 space-y-2">
+                                                        <div className="mt-3 space-y-0">
                                                             {msg.thinking_trace.map(
-                                                                (step, si) => (
-                                                                    <div
-                                                                        key={si}
-                                                                        className="text-xs"
-                                                                    >
-                                                                        <p className="font-medium">
-                                                                            {iconMap[
-                                                                                step
-                                                                                    .step
-                                                                            ] ||
-                                                                                "🤖"}{" "}
-                                                                            {
-                                                                                step.content
+                                                                (step, si) => {
+                                                                    const meta =
+                                                                        iconMap[
+                                                                            step
+                                                                                .step
+                                                                        ] ||
+                                                                        {
+                                                                            icon: "🤖",
+                                                                            color: "text-muted-foreground",
+                                                                        };
+                                                                    const isLast =
+                                                                        si ===
+                                                                        msg
+                                                                            .thinking_trace!
+                                                                            .length -
+                                                                            1;
+                                                                    return (
+                                                                        <div
+                                                                            key={
+                                                                                si
                                                                             }
-                                                                        </p>
-                                                                        {step.detail && (
-                                                                            <p className="text-muted-foreground mt-0.5 ml-5">
-                                                                                {
-                                                                                    step.detail
-                                                                                }
-                                                                            </p>
-                                                                        )}
-                                                                    </div>
-                                                                ),
+                                                                            className="flex gap-3"
+                                                                        >
+                                                                            {/* Timeline line + dot */}
+                                                                            <div className="flex flex-col items-center">
+                                                                                <div
+                                                                                    className={cn(
+                                                                                        "flex h-6 w-6 items-center justify-center rounded-full bg-muted text-xs",
+                                                                                        meta.color,
+                                                                                    )}
+                                                                                >
+                                                                                    {
+                                                                                        meta.icon
+                                                                                    }
+                                                                                </div>
+                                                                                {!isLast && (
+                                                                                    <div className="w-px flex-1 bg-border min-h-[20px]" />
+                                                                                )}
+                                                                            </div>
+                                                                            {/* Content */}
+                                                                            <div className="pb-3 flex-1">
+                                                                                <p className="text-xs font-medium">
+                                                                                    {
+                                                                                        step.content
+                                                                                    }
+                                                                                </p>
+                                                                                {step.detail && (
+                                                                                    <p className="text-xs text-muted-foreground mt-0.5">
+                                                                                        {
+                                                                                            step.detail
+                                                                                        }
+                                                                                    </p>
+                                                                                )}
+                                                                            </div>
+                                                                        </div>
+                                                                    );
+                                                                },
                                                             )}
                                                         </div>
                                                     )}
@@ -359,26 +422,37 @@ export default function KnowSeekerPage() {
                                             msg.citations &&
                                             msg.citations.length > 0 && (
                                                 <div className="mt-3 border-t pt-3">
-                                                    <p className="text-xs font-medium text-muted-foreground mb-1">
-                                                        📎 引用来源
+                                                    <p className="text-xs font-medium text-muted-foreground mb-1.5">
+                                                        引用来源
                                                     </p>
-                                                    {msg.citations.map(
-                                                        (c, ci) => (
-                                                            <p
-                                                                key={ci}
-                                                                className="text-xs text-muted-foreground bg-background/50 rounded px-2 py-1 mt-1"
-                                                            >
-                                                                {c.doc_name}
-                                                            </p>
-                                                        ),
-                                                    )}
+                                                    <div className="flex flex-wrap gap-1.5">
+                                                        {msg.citations.map(
+                                                            (c, ci) => (
+                                                                <Badge
+                                                                    key={ci}
+                                                                    variant="outline"
+                                                                    className="text-xs gap-1"
+                                                                >
+                                                                    <FileText className="h-3 w-3" />
+                                                                    {c.doc_name}
+                                                                </Badge>
+                                                            ),
+                                                        )}
+                                                    </div>
                                                 </div>
                                             )}
                                     </div>
+
+                                    {/* User avatar */}
+                                    {msg.role === "user" && (
+                                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
+                                            <User className="h-4 w-4 text-muted-foreground" />
+                                        </div>
+                                    )}
                                 </div>
                             ))}
                             {loading && (
-                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                <div className="flex items-center gap-2 text-sm text-muted-foreground pl-11">
                                     <Loader2 className="h-4 w-4 animate-spin" />
                                     Agent 正在思考...
                                 </div>
@@ -390,7 +464,7 @@ export default function KnowSeekerPage() {
 
                 {/* Error */}
                 {error && (
-                    <div className="mx-4 mb-2 rounded-md bg-destructive/10 px-4 py-2 text-sm text-destructive">
+                    <div className="mx-4 mb-2 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-2 text-sm text-destructive">
                         {error}
                         <button
                             className="ml-2 underline"
@@ -403,7 +477,7 @@ export default function KnowSeekerPage() {
 
                 {/* Input Area */}
                 <div className="border-t p-4">
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 max-w-3xl mx-auto">
                         <Input
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
@@ -416,6 +490,7 @@ export default function KnowSeekerPage() {
                             onClick={handleSend}
                             disabled={loading || !input.trim()}
                             size="icon"
+                            className="h-10 w-10"
                         >
                             {loading ? (
                                 <Loader2 className="h-4 w-4 animate-spin" />

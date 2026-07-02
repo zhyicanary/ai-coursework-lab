@@ -19,6 +19,10 @@ import {
     Download,
     FileText,
     CheckCircle2,
+    Cloud,
+    Train,
+    Hotel,
+    ClipboardList,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,21 +35,21 @@ import { cn } from "@/lib/utils";
 
 const API_BASE = "http://localhost:8000";
 const STORAGE_KEY = "tripmind_plan";
-const ADJUST_KEY = "tripmind_adjust";
 
 interface AgentStatus {
     name: string;
     label: string;
     status: "pending" | "running" | "done" | "error";
     icon: React.ElementType;
+    color: string;
 }
 
 const agentDefs: Omit<AgentStatus, "status">[] = [
-    { name: "weather", label: "天气查询", icon: CloudIcon },
-    { name: "transport", label: "交通查询", icon: TrainIcon },
-    { name: "hotel", label: "酒店查询", icon: Building2 },
-    { name: "itinerary", label: "行程规划", icon: Calendar },
-    { name: "budget", label: "预算分析", icon: Banknote },
+    { name: "weather", label: "天气", icon: Cloud, color: "text-sky-500" },
+    { name: "transport", label: "交通", icon: Train, color: "text-violet-500" },
+    { name: "hotel", label: "住宿", icon: Hotel, color: "text-amber-500" },
+    { name: "itinerary", label: "行程", icon: Calendar, color: "text-emerald-500" },
+    { name: "budget", label: "预算", icon: Banknote, color: "text-rose-500" },
 ];
 
 const preferencesList = [
@@ -56,36 +60,6 @@ const preferencesList = [
     { key: "leisure", label: "休闲", icon: Umbrella },
 ];
 
-function CloudIcon() {
-    return (
-        <svg
-            className="h-4 w-4"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-        >
-            <path d="M17.5 19H9a7 7 0 1 1 6.7-10 3.5 3.5 0 1 1 1.8 10Z" />
-        </svg>
-    );
-}
-function TrainIcon() {
-    return (
-        <svg
-            className="h-4 w-4"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-        >
-            <rect x="4" y="3" width="16" height="16" rx="2" />
-            <path d="M4 11h16" />
-            <path d="M12 3v8" />
-            <circle cx="8" cy="16" r="2" />
-            <circle cx="16" cy="16" r="2" />
-        </svg>
-    );
-}
 function CoffeeIcon() {
     return (
         <svg
@@ -121,16 +95,14 @@ export default function TripMindPage() {
     const [adjustInput, setAdjustInput] = useState("");
     const [adjustLoading, setAdjustLoading] = useState(false);
     const [adjustResult, setAdjustResult] = useState<string | null>(null);
-    const [adjustAgents, setAdjustAgents] = useState<string[]>([]);  // 调整涉及的 Agent
+    const [adjustAgents, setAdjustAgents] = useState<string[]>([]);
     const [error, setError] = useState<string | null>(null);
-    const [downloading, setDownloading] = useState(false);
     const [copied, setCopied] = useState(false);
     const [lastState, setLastState] = useState<Record<string, unknown> | null>(
         null,
     );
     const resultRef = useRef<HTMLDivElement>(null);
 
-    // Restore results from localStorage on mount
     useEffect(() => {
         const saved = localStorage.getItem(STORAGE_KEY);
         if (saved) {
@@ -145,7 +117,6 @@ export default function TripMindPage() {
         }
     }, []);
 
-    // Save planResult + adjustResult to localStorage whenever they change
     useEffect(() => {
         if (planResult) {
             localStorage.setItem(
@@ -161,7 +132,6 @@ export default function TripMindPage() {
         );
     };
 
-    // 根据调整指令推断受影响的 Agent（与后端 _parse_adjustment 逻辑一致）
     const inferAffectedAgents = (instruction: string): string[] => {
         const kw = instruction.toLowerCase();
         const agents = new Set<string>();
@@ -179,11 +149,9 @@ export default function TripMindPage() {
                 keys.forEach((k) => agents.add(k));
             }
         }
-        // 任何变更都重算 budget + summarizer（除纯天气外）
         if (agents.size > 0 && !(agents.size === 1 && agents.has("weather"))) {
             agents.add("budget");
         }
-        // 默认至少重算行程+预算
         if (agents.size === 0) {
             agents.add("itinerary");
             agents.add("budget");
@@ -249,7 +217,6 @@ export default function TripMindPage() {
                             } else if (parsed.__full_state__) {
                                 setLastState(parsed.__full_state__);
                             } else {
-                                // Update agent statuses from state keys
                                 const agentKeys: Record<string, string> = {
                                     weather_result: "weather",
                                     transport_result: "transport",
@@ -303,7 +270,6 @@ export default function TripMindPage() {
         setAdjustLoading(true);
         setError(null);
 
-        // 推断可能受影响的 Agent 并显示
         const guessedAgents = inferAffectedAgents(text);
         setAdjustAgents(guessedAgents);
         setAgentStatuses((prev) =>
@@ -329,13 +295,11 @@ export default function TripMindPage() {
             if (newPlan) {
                 setPlanResult(newPlan);
                 setLastState(data);
-                // 标记受影响的 Agent 为完成
                 setAgentStatuses((prev) =>
                     prev.map((a) =>
                         guessedAgents.includes(a.name) ? { ...a, status: "done" } : a,
                     ),
                 );
-                // 3 秒后恢复待命状态
                 setTimeout(() => {
                     setAgentStatuses(prev =>
                         prev.map(a => a.status === "done" ? { ...a, status: "pending" } : a)
@@ -343,7 +307,7 @@ export default function TripMindPage() {
                     setAdjustAgents([]);
                 }, 3000);
             }
-            setAdjustResult(text);  // 记录调整指令用于下载报告
+            setAdjustResult(text);
         } catch (err) {
             setError(err instanceof Error ? err.message : "调整请求失败");
             setAgentStatuses((prev) =>
@@ -356,12 +320,10 @@ export default function TripMindPage() {
         }
     };
 
-    // ── 下载 / 导出 ────────────────────────────────
-
     const buildFullReport = useCallback(() => {
         const date = new Date().toLocaleString("zh-CN");
         const lines = [
-            `# 🗺️ 旅行方案 — ${destination || "未指定目的地"}`,
+            `# 旅行方案 — ${destination || "未指定目的地"}`,
             ``,
             `**生成时间**: ${date}`,
             `**出发城市**: ${departure || "未指定"}`,
@@ -374,7 +336,7 @@ export default function TripMindPage() {
             planResult || "（无方案数据）",
         ];
         if (adjustResult) {
-            lines.push(``, `---`, `## 🔄 调整记录`, ``, `> ${adjustResult}`, ``);
+            lines.push(``, `---`, `## 调整记录`, ``, `> ${adjustResult}`, ``);
         }
         return lines.join("\n");
     }, [
@@ -431,111 +393,126 @@ export default function TripMindPage() {
         }
     }, [planResult]);
 
-    const statusColor = (status: string) => {
-        switch (status) {
-            case "running":
-                return "text-blue-500";
-            case "done":
-                return "text-green-500";
-            case "error":
-                return "text-red-500";
-            default:
-                return "text-muted-foreground";
-        }
-    };
-
-    const statusDot = (status: string) => {
-        const base = "inline-block h-2 w-2 rounded-full";
-        switch (status) {
-            case "running":
-                return (
-                    <span className={cn(base, "bg-blue-500 animate-pulse")} />
-                );
-            case "done":
-                return <span className={cn(base, "bg-green-500")} />;
-            case "error":
-                return <span className={cn(base, "bg-red-500")} />;
-            default:
-                return <span className={cn(base, "bg-muted-foreground/30")} />;
-        }
+    const statusConfig: Record<
+        string,
+        { bg: string; border: string; text: string; dot: string; label: string }
+    > = {
+        pending: {
+            bg: "",
+            border: "border-border",
+            text: "text-muted-foreground",
+            dot: "bg-muted-foreground/30",
+            label: "等待中",
+        },
+        running: {
+            bg: "bg-sky-500/5",
+            border: "border-sky-500/40",
+            text: "text-sky-500",
+            dot: "bg-sky-500 animate-pulse",
+            label: "执行中",
+        },
+        done: {
+            bg: "bg-emerald-500/5",
+            border: "border-emerald-500/40",
+            text: "text-emerald-500",
+            dot: "bg-emerald-500",
+            label: "完成",
+        },
+        error: {
+            bg: "bg-rose-500/5",
+            border: "border-rose-500/40",
+            text: "text-rose-500",
+            dot: "bg-rose-500",
+            label: "失败",
+        },
     };
 
     return (
-        <div className="flex h-full">
-            <div className="flex-1 overflow-auto p-4 md:p-8">
-                <div className="max-w-4xl mx-auto space-y-6">
-                    {/* Header */}
-                    <div className="flex items-center gap-2">
-                        <Plane className="h-6 w-6 text-primary" />
-                        <h1 className="text-2xl font-bold">
-                            TripMind 旅游规划
-                        </h1>
-                        <Badge variant="secondary" className="ml-2">
-                            Multi-Agent
-                        </Badge>
+        <div className="scrollbar-thin overflow-auto p-4 md:p-8">
+            <div className="max-w-4xl mx-auto space-y-6">
+                {/* Header */}
+                <div className="flex items-center gap-3 animate-fade-in">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500/15 to-teal-500/15 ring-1 ring-cyan-500/20">
+                        <Plane className="h-5 w-5 text-cyan-600 dark:text-cyan-400" />
                     </div>
-                    <p className="text-muted-foreground">
-                        填写旅行需求，6 个专业 Agent
-                        并行协作，为您生成完整的旅行方案。
-                    </p>
+                    <div>
+                        <div className="flex items-center gap-2">
+                            <h1 className="text-2xl font-bold">
+                                TripMind 旅游规划
+                            </h1>
+                            <Badge variant="secondary" className="gap-1">
+                                Multi-Agent
+                            </Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                            填写旅行需求，6 个专业 Agent 并行协作生成方案
+                        </p>
+                    </div>
+                </div>
 
-                    {/* Form */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-lg">旅行需求</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="grid gap-4 md:grid-cols-2">
-                                <div className="space-y-2">
-                                    <Label htmlFor="destination">目的地</Label>
-                                    <div className="relative">
-                                        <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                        <Input
-                                            id="destination"
-                                            className="pl-9"
-                                            placeholder="e.g., 北京"
-                                            value={destination}
-                                            onChange={(e) =>
-                                                setDestination(e.target.value)
-                                            }
-                                        />
-                                    </div>
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="departure">出发城市</Label>
-                                    <div className="relative">
-                                        <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                        <Input
-                                            id="departure"
-                                            className="pl-9"
-                                            placeholder="e.g., 上海"
-                                            value={departure}
-                                            onChange={(e) =>
-                                                setDeparture(e.target.value)
-                                            }
-                                        />
-                                    </div>
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="days">天数</Label>
+                {/* Form Card */}
+                <Card className="animate-fade-in-up overflow-hidden">
+                    <CardHeader className="bg-muted/30 border-b">
+                        <CardTitle className="text-base flex items-center gap-2">
+                            <ClipboardList className="h-4 w-4 text-muted-foreground" />
+                            旅行需求
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4 pt-4">
+                        <div className="grid gap-4 md:grid-cols-2">
+                            <div className="space-y-2">
+                                <Label htmlFor="destination">目的地</Label>
+                                <div className="relative">
+                                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                                     <Input
-                                        id="days"
-                                        type="number"
-                                        min={1}
-                                        max={30}
-                                        value={days}
+                                        id="destination"
+                                        className="pl-9"
+                                        placeholder="例如：北京"
+                                        value={destination}
                                         onChange={(e) =>
-                                            setDays(Number(e.target.value))
+                                            setDestination(e.target.value)
                                         }
                                     />
                                 </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="budget">预算 (CNY)</Label>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="departure">出发城市</Label>
+                                <div className="relative">
+                                    <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                    <Input
+                                        id="departure"
+                                        className="pl-9"
+                                        placeholder="例如：上海"
+                                        value={departure}
+                                        onChange={(e) =>
+                                            setDeparture(e.target.value)
+                                        }
+                                    />
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="days">天数</Label>
+                                <Input
+                                    id="days"
+                                    type="number"
+                                    min={1}
+                                    max={30}
+                                    value={days}
+                                    onChange={(e) =>
+                                        setDays(Number(e.target.value))
+                                    }
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="budget">预算 (CNY)</Label>
+                                <div className="relative">
+                                    <Banknote className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                                     <Input
                                         id="budget"
                                         type="number"
                                         min={500}
                                         step={100}
+                                        className="pl-9"
                                         value={budget}
                                         onChange={(e) =>
                                             setBudget(Number(e.target.value))
@@ -543,239 +520,241 @@ export default function TripMindPage() {
                                     />
                                 </div>
                             </div>
+                        </div>
 
-                            <div className="space-y-2">
-                                <Label>偏好</Label>
-                                <div className="flex flex-wrap gap-2">
-                                    {preferencesList.map((pref) => {
-                                        const Icon = pref.icon;
-                                        const active = preferences.includes(
-                                            pref.key,
-                                        );
-                                        return (
-                                            <button
-                                                key={pref.key}
-                                                onClick={() =>
-                                                    togglePreference(pref.key)
-                                                }
-                                                className={cn(
-                                                    "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
-                                                    active
-                                                        ? "bg-primary text-primary-foreground border-primary"
-                                                        : "bg-background hover:bg-accent hover:text-accent-foreground",
-                                                )}
-                                            >
-                                                <Icon className="h-3.5 w-3.5" />
-                                                {pref.label}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
+                        <div className="space-y-2">
+                            <Label>偏好</Label>
+                            <div className="flex flex-wrap gap-2">
+                                {preferencesList.map((pref) => {
+                                    const Icon = pref.icon;
+                                    const active = preferences.includes(
+                                        pref.key,
+                                    );
+                                    return (
+                                        <button
+                                            key={pref.key}
+                                            onClick={() =>
+                                                togglePreference(pref.key)
+                                            }
+                                            className={cn(
+                                                "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-all",
+                                                active
+                                                    ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                                                    : "bg-background hover:bg-accent hover:text-accent-foreground border-border",
+                                            )}
+                                        >
+                                            <Icon className="h-3.5 w-3.5" />
+                                            {pref.label}
+                                        </button>
+                                    );
+                                })}
                             </div>
+                        </div>
 
-                            <Button
-                                className="w-full gap-2"
-                                size="lg"
-                                onClick={handlePlan}
-                                disabled={planning}
-                            >
-                                {planning ? (
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                    <Plane className="h-4 w-4" />
-                                )}
-                                {planning ? "规划中..." : "开始规划"}
-                            </Button>
+                        <Button
+                            className="w-full gap-2"
+                            size="lg"
+                            onClick={handlePlan}
+                            disabled={planning}
+                        >
+                            {planning ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                                <Plane className="h-4 w-4" />
+                            )}
+                            {planning ? "Agent 协作中..." : "开始规划"}
+                        </Button>
+                    </CardContent>
+                </Card>
+
+                {/* Error */}
+                {error && (
+                    <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+                        {error}
+                        <button
+                            className="ml-2 underline"
+                            onClick={() => setError(null)}
+                        >
+                            关闭
+                        </button>
+                    </div>
+                )}
+
+                {/* Agent Status Panel — Visual Progress Timeline */}
+                {(planning || adjustLoading) && (
+                    <Card className="animate-fade-in-up overflow-hidden">
+                        <CardHeader className="bg-muted/30 border-b pb-3">
+                            <CardTitle className="text-base flex items-center gap-2">
+                                <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                                Agent 执行状态
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="pt-4">
+                            {/* Horizontal progress bar */}
+                            <div className="mb-4 flex items-center gap-1">
+                                {agentStatuses.map((agent, i) => {
+                                    const cfg = statusConfig[agent.status];
+                                    return (
+                                        <div key={agent.name} className="flex flex-1 items-center">
+                                            <div
+                                                className={cn(
+                                                    "h-1.5 flex-1 rounded-full transition-all duration-500",
+                                                    agent.status === "done"
+                                                        ? "bg-emerald-500"
+                                                        : agent.status === "running"
+                                                          ? "bg-sky-500"
+                                                          : agent.status === "error"
+                                                            ? "bg-rose-500"
+                                                            : "bg-muted",
+                                                )}
+                                            />
+                                            {i < agentStatuses.length - 1 && (
+                                                <div className="w-1" />
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                            {/* Agent cards */}
+                            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                                {agentStatuses.map((agent) => {
+                                    const Icon = agent.icon;
+                                    const cfg = statusConfig[agent.status];
+                                    return (
+                                        <div
+                                            key={agent.name}
+                                            className={cn(
+                                                "flex flex-col items-center gap-1.5 rounded-lg border p-3 transition-all",
+                                                cfg.bg,
+                                                cfg.border,
+                                            )}
+                                        >
+                                            <Icon className={cn("h-5 w-5", agent.color)} />
+                                            <p className="text-xs font-medium">
+                                                {agent.label}
+                                            </p>
+                                            <div className={cn("flex items-center gap-1.5 text-xs", cfg.text)}>
+                                                <span className={cn("inline-block h-1.5 w-1.5 rounded-full", cfg.dot)} />
+                                                {cfg.label}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
                         </CardContent>
                     </Card>
+                )}
 
-                    {/* Error */}
-                    {error && (
-                        <div className="rounded-md bg-destructive/10 px-4 py-3 text-sm text-destructive">
-                            {error}
-                            <button
-                                className="ml-2 underline"
-                                onClick={() => setError(null)}
-                            >
-                                关闭
-                            </button>
-                        </div>
-                    )}
-
-                    {/* Agent Status Panel — 规划或调整时显示 */}
-                    {(planning || adjustLoading) && (
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="text-lg">
-                                    Agent 执行状态
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="grid gap-3 md:grid-cols-3">
-                                    {agentStatuses.map((agent) => {
-                                        const Icon = agent.icon;
-                                        return (
-                                            <div
-                                                key={agent.name}
-                                                className={cn(
-                                                    "flex items-center gap-3 rounded-md border p-3 transition-colors",
-                                                    agent.status ===
-                                                        "running" &&
-                                                        "border-blue-500/50 bg-blue-500/5",
-                                                    agent.status === "done" &&
-                                                        "border-green-500/50 bg-green-500/5",
-                                                    agent.status === "error" &&
-                                                        "border-red-500/50 bg-red-500/5",
-                                                )}
-                                            >
-                                                <Icon />
-                                                <div className="flex-1 min-w-0">
-                                                    <p className="text-sm font-medium truncate">
-                                                        {agent.label}
-                                                    </p>
-                                                    <div
-                                                        className={cn(
-                                                            "flex items-center gap-1.5 text-xs",
-                                                            statusColor(
-                                                                agent.status,
-                                                            ),
-                                                        )}
-                                                    >
-                                                        {statusDot(
-                                                            agent.status,
-                                                        )}
-                                                        {agent.status ===
-                                                            "pending" &&
-                                                            "等待中"}
-                                                        {agent.status ===
-                                                            "running" &&
-                                                            "执行中"}
-                                                        {agent.status ===
-                                                            "done" && "完成"}
-                                                        {agent.status ===
-                                                            "error" && "失败"}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
+                {/* Plan Result + Download */}
+                {planResult && (
+                    <Card ref={resultRef} className="animate-fade-in-up overflow-hidden">
+                        <CardHeader className="bg-muted/30 border-b">
+                            <div className="flex items-center justify-between gap-2 flex-wrap">
+                                <div className="flex items-center gap-2">
+                                    <CardTitle className="text-base">
+                                        旅行方案
+                                    </CardTitle>
+                                    {adjustResult && (
+                                        <Badge variant="outline" className="gap-1 text-xs">
+                                            <RefreshCw className="h-3 w-3" />
+                                            已调整
+                                        </Badge>
+                                    )}
                                 </div>
-                            </CardContent>
-                        </Card>
-                    )}
-
-                    {/* Plan Result + Download */}
-                    {planResult && (
-                        <Card ref={resultRef}>
-                            <CardHeader>
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                        <CardTitle className="text-lg">
-                                            📋 旅行方案
-                                        </CardTitle>
-                                        {adjustResult && (
-                                            <Badge variant="outline" className="gap-1 text-xs">
-                                                <RefreshCw className="h-3 w-3" />
-                                                已调整: {adjustResult}
-                                            </Badge>
-                                        )}
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            className="gap-1.5"
-                                            onClick={handleDownloadMarkdown}
-                                        >
-                                            <Download className="h-3.5 w-3.5" />
-                                            MD
-                                        </Button>
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            className="gap-1.5"
-                                            onClick={handleDownloadText}
-                                        >
-                                            <FileText className="h-3.5 w-3.5" />
-                                            TXT
-                                        </Button>
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            className="gap-1.5"
-                                            onClick={handleCopyMarkdown}
-                                        >
-                                            {copied ? (
-                                                <>
-                                                    <CheckCircle2 className="h-3.5 w-3.5" />{" "}
-                                                    已复制
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <FileText className="h-3.5 w-3.5" />{" "}
-                                                    复制
-                                                </>
-                                            )}
-                                        </Button>
-                                    </div>
-                                </div>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="prose prose-sm dark:prose-invert max-w-none">
-                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                        {planResult}
-                                    </ReactMarkdown>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    )}
-
-                    {/* Adjustment Chat */}
-                    {planResult && (
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="text-lg">
-                                    💬 追问调整
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="flex gap-2">
-                                    <Input
-                                        placeholder="对方案有任何问题或调整需求..."
-                                        value={adjustInput}
-                                        onChange={(e) =>
-                                            setAdjustInput(e.target.value)
-                                        }
-                                        onKeyDown={(e) => {
-                                            if (
-                                                e.key === "Enter" &&
-                                                !e.shiftKey
-                                            ) {
-                                                e.preventDefault();
-                                                handleAdjust();
-                                            }
-                                        }}
-                                        disabled={adjustLoading}
-                                        className="flex-1"
-                                    />
+                                <div className="flex gap-1.5">
                                     <Button
-                                        onClick={handleAdjust}
-                                        disabled={
-                                            adjustLoading || !adjustInput.trim()
-                                        }
-                                        size="icon"
+                                        variant="outline"
+                                        size="sm"
+                                        className="gap-1.5 h-8"
+                                        onClick={handleDownloadMarkdown}
                                     >
-                                        {adjustLoading ? (
-                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                        <Download className="h-3.5 w-3.5" />
+                                        MD
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="gap-1.5 h-8"
+                                        onClick={handleDownloadText}
+                                    >
+                                        <FileText className="h-3.5 w-3.5" />
+                                        TXT
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="gap-1.5 h-8"
+                                        onClick={handleCopyMarkdown}
+                                    >
+                                        {copied ? (
+                                            <>
+                                                <CheckCircle2 className="h-3.5 w-3.5" />
+                                                已复制
+                                            </>
                                         ) : (
-                                            <RefreshCw className="h-4 w-4" />
+                                            <>
+                                                <FileText className="h-3.5 w-3.5" />
+                                                复制
+                                            </>
                                         )}
                                     </Button>
                                 </div>
-                            </CardContent>
-                        </Card>
-                    )}
-                </div>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="pt-4">
+                            <div className="prose prose-sm dark:prose-invert max-w-none">
+                                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                    {planResult}
+                                </ReactMarkdown>
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
+
+                {/* Adjustment Chat */}
+                {planResult && (
+                    <Card className="animate-fade-in-up">
+                        <CardHeader className="bg-muted/30 border-b pb-3">
+                            <CardTitle className="text-base">
+                                追问调整
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="pt-4">
+                            <div className="flex gap-2">
+                                <Input
+                                    placeholder="例如：换个便宜点的酒店"
+                                    value={adjustInput}
+                                    onChange={(e) =>
+                                        setAdjustInput(e.target.value)
+                                    }
+                                    onKeyDown={(e) => {
+                                        if (e.key === "Enter" && !e.shiftKey) {
+                                            e.preventDefault();
+                                            handleAdjust();
+                                        }
+                                    }}
+                                    disabled={adjustLoading}
+                                    className="flex-1"
+                                />
+                                <Button
+                                    onClick={handleAdjust}
+                                    disabled={adjustLoading || !adjustInput.trim()}
+                                    size="icon"
+                                    className="h-10 w-10"
+                                >
+                                    {adjustLoading ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                        <RefreshCw className="h-4 w-4" />
+                                    )}
+                                </Button>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-2">
+                                支持调整酒店、交通、行程、预算等，系统将仅重算受影响的 Agent
+                            </p>
+                        </CardContent>
+                    </Card>
+                )}
             </div>
         </div>
     );

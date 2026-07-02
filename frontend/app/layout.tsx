@@ -3,20 +3,83 @@
 import { Inter } from "next/font/google";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Brain, Search, Plane, Settings } from "lucide-react";
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { Brain, Search, Plane, Settings, Moon, Sun } from "lucide-react";
+import { useState, useEffect } from "react";
+import {
+    SidebarProvider,
+    SidebarInset,
+    SidebarTrigger,
+} from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
-import { cn } from "@/lib/utils";
+import { Separator } from "@/components/ui/separator";
+import {
+    Breadcrumb,
+    BreadcrumbItem,
+    BreadcrumbLink,
+    BreadcrumbList,
+    BreadcrumbPage,
+    BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
+import { Button } from "@/components/ui/button";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"] });
 
 const navItems = [
-    { href: "/", label: "Home", icon: Brain },
+    { href: "/", label: "首页", icon: Brain },
     { href: "/knowseeker", label: "KnowSeeker", icon: Search },
     { href: "/tripmind", label: "TripMind", icon: Plane },
-    { href: "/settings", label: "Settings", icon: Settings },
+    { href: "/settings", label: "设置", icon: Settings },
 ];
+
+function ThemeToggle() {
+    const [dark, setDark] = useState(false);
+
+    useEffect(() => {
+        const stored = localStorage.getItem("theme");
+        if (
+            stored === "dark" ||
+            (!stored && window.matchMedia("(prefers-color-scheme: dark)").matches)
+        ) {
+            setDark(true);
+            document.documentElement.classList.add("dark");
+        }
+    }, []);
+
+    const toggle = () => {
+        setDark((prev) => {
+            const next = !prev;
+            if (next) {
+                document.documentElement.classList.add("dark");
+                localStorage.setItem("theme", "dark");
+            } else {
+                document.documentElement.classList.remove("dark");
+                localStorage.setItem("theme", "light");
+            }
+            return next;
+        });
+    };
+
+    return (
+        <Button variant="ghost" size="icon" onClick={toggle} className="h-8 w-8">
+            {dark ? (
+                <Sun className="h-4 w-4" />
+            ) : (
+                <Moon className="h-4 w-4" />
+            )}
+        </Button>
+    );
+}
+
+function getBreadcrumb(pathname: string) {
+    const item = navItems.find((n) => n.href === pathname);
+    if (!item) return [{ label: "首页", href: "/" }];
+    if (pathname === "/") return [{ label: "首页", href: "/" }];
+    return [
+        { label: "首页", href: "/" },
+        { label: item.label, href: pathname },
+    ];
+}
 
 export default function RootLayout({
     children,
@@ -24,49 +87,61 @@ export default function RootLayout({
     children: React.ReactNode;
 }) {
     const pathname = usePathname();
+    const breadcrumbs = getBreadcrumb(pathname);
 
     return (
         <html lang="zh-CN" suppressHydrationWarning>
             <body className={inter.className}>
                 <SidebarProvider defaultOpen>
                     <AppSidebar />
-                    <div className="flex flex-1 flex-col min-h-screen">
-                        <header className="sticky top-0 z-40 flex h-14 items-center gap-2 border-b bg-background px-4">
+                    <SidebarInset>
+                        {/* Header with breadcrumb */}
+                        <header className="sticky top-0 z-40 flex h-14 shrink-0 items-center gap-2 border-b bg-background/80 backdrop-blur-sm px-4">
                             <SidebarTrigger className="-ml-1" />
-                            <Link
-                                href="/"
-                                className="flex items-center gap-2 font-semibold"
-                            >
-                                <Brain className="h-5 w-5 text-primary" />
-                                <span>AI Coursework Lab</span>
-                            </Link>
+                            <Separator
+                                orientation="vertical"
+                                className="mr-2 h-4"
+                            />
+                            <Breadcrumb>
+                                <BreadcrumbList>
+                                    {breadcrumbs.map((bc, i) => (
+                                        <div
+                                            key={bc.href}
+                                            className="flex items-center gap-2"
+                                        >
+                                            {i > 0 && (
+                                                <BreadcrumbSeparator className="hidden md:block" />
+                                            )}
+                                            <BreadcrumbItem>
+                                                {i === breadcrumbs.length - 1 ? (
+                                                    <BreadcrumbPage>
+                                                        {bc.label}
+                                                    </BreadcrumbPage>
+                                                ) : (
+                                                    <BreadcrumbLink asChild>
+                                                        <Link href={bc.href}>
+                                                            {bc.label}
+                                                        </Link>
+                                                    </BreadcrumbLink>
+                                                )}
+                                            </BreadcrumbItem>
+                                        </div>
+                                    ))}
+                                </BreadcrumbList>
+                            </Breadcrumb>
+                            <div className="ml-auto flex items-center gap-2">
+                                <Link
+                                    href="/"
+                                    className="flex items-center gap-1.5 text-sm font-semibold md:hidden"
+                                >
+                                    <Brain className="h-4 w-4 text-primary" />
+                                </Link>
+                                <ThemeToggle />
+                            </div>
                         </header>
                         <main className="flex-1">{children}</main>
-                    </div>
+                    </SidebarInset>
                 </SidebarProvider>
-
-                {/* Mobile bottom nav (shown only on small screens) */}
-                <div className="fixed bottom-0 left-0 right-0 z-50 flex h-14 items-center justify-around border-t bg-background md:hidden">
-                    {navItems.map((item) => {
-                        const Icon = item.icon;
-                        const isActive = pathname === item.href;
-                        return (
-                            <Link
-                                key={item.href}
-                                href={item.href}
-                                className={cn(
-                                    "flex flex-col items-center gap-0.5 px-3 py-1 text-xs transition-colors",
-                                    isActive
-                                        ? "text-primary"
-                                        : "text-muted-foreground hover:text-foreground",
-                                )}
-                            >
-                                <Icon className="h-5 w-5" />
-                                {item.label}
-                            </Link>
-                        );
-                    })}
-                </div>
             </body>
         </html>
     );

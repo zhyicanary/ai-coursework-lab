@@ -1,7 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Settings, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
+import {
+    Settings,
+    Loader2,
+    CheckCircle2,
+    AlertCircle,
+    Rocket,
+    Server,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,6 +27,8 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 const API_BASE = "http://localhost:8000";
 
@@ -36,7 +45,6 @@ export default function SettingsPage() {
         message: string;
     }>({ type: "", message: "" });
 
-    // Load settings on mount
     useEffect(() => {
         const load = async () => {
             try {
@@ -56,7 +64,6 @@ export default function SettingsPage() {
         load();
     }, []);
 
-    // When backend changes, reset model + baseUrl to defaults for that backend
     useEffect(() => {
         if (backend === "ollama") {
             setBaseUrl((prev) =>
@@ -78,7 +85,6 @@ export default function SettingsPage() {
         }
     }, [backend]);
 
-    // Fetch models when mount or backend changes
     useEffect(() => {
         const fetchModels = async () => {
             setModelsLoading(true);
@@ -88,18 +94,13 @@ export default function SettingsPage() {
                     const data = await res.json();
                     const list = Array.isArray(data.models) ? data.models : [];
                     setModels(list);
-                    // Auto-select first if none selected
                     setModel((prev) => prev || list[0] || "");
                 }
             } catch {
                 const fallback =
                     backend === "ollama"
                         ? ["gemma4:latest"]
-                        : [
-                              "deepseek-chat",
-                              "deepseek-reasoner",
-                              "deepseek-coder",
-                          ];
+                        : ["deepseek-chat", "deepseek-reasoner", "deepseek-coder"];
                 setModels(fallback);
                 setModel((prev) => prev || fallback[0]);
             } finally {
@@ -128,12 +129,10 @@ export default function SettingsPage() {
             if (res.ok) {
                 setStatus({
                     type: "success",
-                    message: `✅ 配置已保存 — ${backend} / ${model}`,
+                    message: `配置已保存 — ${backend} / ${model}`,
                 });
             } else {
-                const err = await res
-                    .json()
-                    .catch(() => ({ detail: "保存失败" }));
+                const err = await res.json().catch(() => ({ detail: "保存失败" }));
                 throw new Error(err.detail || "保存失败");
             }
         } catch (err) {
@@ -146,61 +145,90 @@ export default function SettingsPage() {
         }
     };
 
+    const backendOptions = [
+        {
+            value: "deepseek" as const,
+            icon: Rocket,
+            label: "DeepSeek",
+            desc: "API 云端调用",
+            gradient: "from-violet-500 to-blue-500",
+        },
+        {
+            value: "ollama" as const,
+            icon: Server,
+            label: "Ollama",
+            desc: "本地部署",
+            gradient: "from-emerald-500 to-teal-500",
+        },
+    ];
+
     return (
-        <div className="flex-1 overflow-auto p-4 md:p-8">
+        <div className="scrollbar-thin overflow-auto p-4 md:p-8">
             <div className="max-w-2xl mx-auto space-y-6">
                 {/* Header */}
-                <div className="flex items-center gap-2">
-                    <Settings className="h-6 w-6 text-primary" />
-                    <h1 className="text-2xl font-bold">系统设置</h1>
+                <div className="flex items-center gap-3 animate-fade-in">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500/15 to-orange-500/15 ring-1 ring-amber-500/20">
+                        <Settings className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                    </div>
+                    <div>
+                        <h1 className="text-2xl font-bold">系统设置</h1>
+                        <p className="text-sm text-muted-foreground">
+                            配置 AI 模型后端和连接参数
+                        </p>
+                    </div>
                 </div>
-                <p className="text-muted-foreground">
-                    配置 AI 模型后端和连接参数。
-                </p>
 
                 {/* Backend Settings */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-lg">后端配置</CardTitle>
+                <Card className="animate-fade-in-up overflow-hidden">
+                    <CardHeader className="bg-muted/30 border-b">
+                        <CardTitle className="text-base">后端配置</CardTitle>
                         <CardDescription>
                             选择 LLM 后端并配置连接参数
                         </CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-6">
-                        {/* Backend Selector */}
+                    <CardContent className="space-y-6 pt-4">
+                        {/* Backend Selector — Radio Cards */}
                         <div className="space-y-2">
                             <Label>LLM 后端</Label>
-                            <div className="flex gap-3">
-                                <button
-                                    onClick={() => setBackend("deepseek")}
-                                    className={`flex-1 rounded-md border-2 px-4 py-3 text-sm font-medium transition-all ${
-                                        backend === "deepseek"
-                                            ? "border-primary bg-primary/5 text-primary"
-                                            : "border-muted hover:border-muted-foreground/30"
-                                    }`}
-                                >
-                                    <div className="text-base mb-1">
-                                        🚀 DeepSeek
-                                    </div>
-                                    <div className="text-xs text-muted-foreground">
-                                        API 云端调用
-                                    </div>
-                                </button>
-                                <button
-                                    onClick={() => setBackend("ollama")}
-                                    className={`flex-1 rounded-md border-2 px-4 py-3 text-sm font-medium transition-all ${
-                                        backend === "ollama"
-                                            ? "border-primary bg-primary/5 text-primary"
-                                            : "border-muted hover:border-muted-foreground/30"
-                                    }`}
-                                >
-                                    <div className="text-base mb-1">
-                                        🦙 Ollama
-                                    </div>
-                                    <div className="text-xs text-muted-foreground">
-                                        本地部署
-                                    </div>
-                                </button>
+                            <div className="grid gap-3 sm:grid-cols-2">
+                                {backendOptions.map((opt) => {
+                                    const Icon = opt.icon;
+                                    const active = backend === opt.value;
+                                    return (
+                                        <button
+                                            key={opt.value}
+                                            onClick={() => setBackend(opt.value)}
+                                            className={cn(
+                                                "relative flex items-center gap-3 rounded-xl border-2 p-4 text-left transition-all",
+                                                active
+                                                    ? "border-primary bg-primary/5"
+                                                    : "border-border hover:border-muted-foreground/30 hover:bg-accent/50",
+                                            )}
+                                        >
+                                            <div
+                                                className={cn(
+                                                    "flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br text-white shadow-sm",
+                                                    opt.gradient,
+                                                )}
+                                            >
+                                                <Icon className="h-5 w-5" />
+                                            </div>
+                                            <div>
+                                                <p className="font-medium text-sm">
+                                                    {opt.label}
+                                                </p>
+                                                <p className="text-xs text-muted-foreground">
+                                                    {opt.desc}
+                                                </p>
+                                            </div>
+                                            {active && (
+                                                <div className="absolute right-3 top-3 flex h-5 w-5 items-center justify-center rounded-full bg-primary">
+                                                    <CheckCircle2 className="h-3 w-3 text-primary-foreground" />
+                                                </div>
+                                            )}
+                                        </button>
+                                    );
+                                })}
                             </div>
                         </div>
 
@@ -243,7 +271,7 @@ export default function SettingsPage() {
 
                         {/* API Key - shown only for deepseek */}
                         {backend === "deepseek" && (
-                            <div className="space-y-2">
+                            <div className="space-y-2 animate-fade-in">
                                 <Label htmlFor="api-key">API Key</Label>
                                 <Input
                                     id="api-key"
@@ -297,11 +325,12 @@ export default function SettingsPage() {
 
                             {status.type && (
                                 <div
-                                    className={`flex items-center gap-2 text-sm ${
+                                    className={cn(
+                                        "flex items-center gap-2 text-sm animate-fade-in",
                                         status.type === "success"
-                                            ? "text-green-600 dark:text-green-400"
-                                            : "text-destructive"
-                                    }`}
+                                            ? "text-emerald-600 dark:text-emerald-400"
+                                            : "text-destructive",
+                                    )}
                                 >
                                     {status.type === "success" ? (
                                         <CheckCircle2 className="h-4 w-4" />
@@ -316,32 +345,34 @@ export default function SettingsPage() {
                 </Card>
 
                 {/* Current Config Info */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-lg">当前配置</CardTitle>
+                <Card className="animate-fade-in-up">
+                    <CardHeader className="bg-muted/30 border-b">
+                        <CardTitle className="text-base">当前配置</CardTitle>
                     </CardHeader>
-                    <CardContent>
-                        <dl className="space-y-2 text-sm">
-                            <div className="flex justify-between">
+                    <CardContent className="pt-4">
+                        <dl className="grid gap-3 text-sm sm:grid-cols-2">
+                            <div className="flex items-center justify-between rounded-lg border p-3">
                                 <dt className="text-muted-foreground">后端</dt>
-                                <dd className="font-medium">{backend}</dd>
+                                <dd>
+                                    <Badge variant="secondary">
+                                        {backend}
+                                    </Badge>
+                                </dd>
                             </div>
-                            <div className="flex justify-between">
+                            <div className="flex items-center justify-between rounded-lg border p-3">
                                 <dt className="text-muted-foreground">模型</dt>
-                                <dd className="font-medium">
+                                <dd className="font-medium truncate max-w-[140px]">
                                     {model || "未选择"}
                                 </dd>
                             </div>
-                            <div className="flex justify-between">
-                                <dt className="text-muted-foreground">
-                                    Base URL
-                                </dt>
-                                <dd className="font-medium truncate ml-4 max-w-[200px]">
+                            <div className="flex items-center justify-between rounded-lg border p-3 sm:col-span-2">
+                                <dt className="text-muted-foreground">Base URL</dt>
+                                <dd className="font-medium truncate max-w-[200px]">
                                     {baseUrl || "默认"}
                                 </dd>
                             </div>
                             {backend === "deepseek" && (
-                                <div className="flex justify-between">
+                                <div className="flex items-center justify-between rounded-lg border p-3 sm:col-span-2">
                                     <dt className="text-muted-foreground">
                                         API Key
                                     </dt>
