@@ -12,9 +12,10 @@ import time
 from pathlib import Path
 from typing import IO
 
-from common.document_loader import Document, load, chunk_documents
-from common.vector_store import add_documents, search_documents, init_collection, client
+from common.bm25_store import bm25_store
+from common.document_loader import Document, chunk_documents, load
 from common.reranker import reranker
+from common.vector_store import add_documents, client, init_collection, search_documents
 
 
 def index_document(
@@ -41,7 +42,9 @@ def index_document(
     chunks = chunk_documents(raw_docs, chunk_size, chunk_overlap)
 
     # 3. 生成 doc_id（基于文件名 + 时间戳）
-    fname = filename or (Path(file).name if isinstance(file, (str, Path)) else "unknown")
+    fname = filename or (
+        Path(file).name if isinstance(file, (str, Path)) else "unknown"
+    )
     doc_id = f"{fname}_{int(time.time())}"
 
     # 4. 准备 documents 和 texts
@@ -56,6 +59,9 @@ def index_document(
 
     # 5. 索引到 ChromaDB
     add_documents(doc_id=doc_id, documents=docs_for_store, texts=texts)
+
+    # 6. 同步到 BM25 索引
+    bm25_store.add_texts(texts, [d["metadata"] for d in docs_for_store])
 
     return {
         "doc_id": doc_id,
@@ -78,6 +84,49 @@ def search(query: str, top_k: int = 5) -> list[dict]:
     return search_documents(query=query, top_k=top_k)
 
 
+def _hybrid_merge(
+    dense_results: list[dict],
+    sparse_results: list[dict],
+    top_k: int,
+    rrf_k: int = 60,
+) -> list[dict]:
+    """用 Reciprocal Rank Fusion（RRF）合并稠密和稀疏检索结果。
+
+    RRF 公式：score(d) = Σ 1/(k + rank(d))
+    出现在两种结果中的文档获得双方排名贡献，排名越靠前得分越高。
+
+    Args:
+        dense_results: 稠密向量检索结果。
+        sparse_results: BM25 稀疏检索结果。
+        top_k: 合并后返回数量。
+        rrf_k: RRF 常数（通常 60），越大排名差异影响越小。
+
+    Returns:
+        合并后的文档列表。
+    """
+
+    def _key(d):
+        return f"{d.get('doc_id', '')}_{d.get('chunk_index', 0)}"
+
+    rrf_scores: dict[str, float] = {}
+    doc_map: dict[str, dict] = {}
+
+    for rank, doc in enumerate(dense_results):
+        k = _key(doc)
+        rrf_scores[k] = rrf_scores.get(k, 0) + 1.0 / (rrf_k + rank + 1)
+        if k not in doc_map:
+            doc_map[k] = doc
+
+    for rank, doc in enumerate(sparse_results):
+        k = _key(doc)
+        rrf_scores[k] = rrf_scores.get(k, 0) + 1.0 / (rrf_k + rank + 1)
+        if k not in doc_map:
+            doc_map[k] = doc
+
+    sorted_keys = sorted(rrf_scores, key=lambda k: rrf_scores[k], reverse=True)
+    return [doc_map[k] for k in sorted_keys[:top_k]]
+
+
 def search_with_rerank(
     query: str,
     top_k: int = 5,
@@ -98,13 +147,17 @@ def search_with_rerank(
         - reranked_results: 重排后的文档列表
         - rerank_info: 重排序元信息（供 trace 可视化）
     """
-    # 第一阶段：向量粗召回
-    candidates = search_documents(query=query, top_k=recall_k)
+    # 第一阶段：稠密向量粗召回 + BM25 稀疏检索
+    dense_candidates = search_documents(query=query, top_k=recall_k)
+    sparse_candidates = bm25_store.search(query=query, top_k=recall_k)
 
-    if not candidates:
+    if not dense_candidates and not sparse_candidates:
         return [], {"recall_count": 0, "rerank_count": 0, "reranked": False}
 
-    # 记录粗召回分数（用于对比）
+    # 合并两路结果
+    candidates = _hybrid_merge(dense_candidates, sparse_candidates, top_k=recall_k)
+
+    # 记录召回信息
     recall_scores = [
         {"doc_id": c.get("doc_id", ""), "recall_score": c.get("score", 0)}
         for c in candidates
@@ -170,4 +223,5 @@ def delete_document(doc_id: str) -> bool:
 
     if ids_to_delete:
         col.delete(ids=ids_to_delete)
+        bm25_store.mark_dirty()
     return len(ids_to_delete) > 0

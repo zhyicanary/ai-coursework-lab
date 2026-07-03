@@ -1,5 +1,7 @@
-import chromadb
 from pathlib import Path
+
+import chromadb
+
 from common.embedding_client import embedding
 
 # 持久化目录
@@ -22,7 +24,12 @@ def init_collection(collection_name: str = "default"):
     )
 
 
-def add_attractions(city: str, attractions: list[dict], texts: list[str], collection_name: str = "attractions"):
+def add_attractions(
+    city: str,
+    attractions: list[dict],
+    texts: list[str],
+    collection_name: str = "attractions",
+):
     """批量添加景点
 
     Args:
@@ -121,7 +128,12 @@ def search_attractions(
     return attractions
 
 
-def add_documents(doc_id: str, documents: list[dict], texts: list[str], collection_name: str = "documents"):
+def add_documents(
+    doc_id: str,
+    documents: list[dict],
+    texts: list[str],
+    collection_name: str = "documents",
+):
     """添加文档到知识库（KnowSeeker 专用）
 
     Args:
@@ -190,3 +202,29 @@ def search_documents(
             )
 
     return documents
+
+
+def get_all_documents(collection_name: str = "documents") -> list[dict]:
+    """获取集合中所有文档（用于 BM25 索引重建）。
+
+    Args:
+        collection_name: collection 名称，默认 "documents"
+
+    Returns:
+        [{id, content, doc_id, chunk_index}, ...]
+    """
+    collection = init_collection(collection_name)
+    results = collection.get(include=["documents", "metadatas"])
+    docs = []
+    if results["ids"]:
+        for i in range(len(results["ids"])):
+            meta = results["metadatas"][i]
+            docs.append(
+                {
+                    "id": results["ids"][i],
+                    "content": results["documents"][i],
+                    "doc_id": meta.get("doc_id", ""),
+                    "chunk_index": meta.get("chunk_index", 0),
+                }
+            )
+    return docs
