@@ -180,8 +180,24 @@ class LLMClient:
             temperature=temperature,
             max_tokens=max_tokens,
         )
-        content = response.choices[0].message.content or ""
-        return _parse_thinking(content)
+        msg = response.choices[0].message
+        content = msg.content or ""
+        reasoning = getattr(msg, "reasoning_content", None) or ""
+
+        # 调试：看模型实际返回了什么
+        print(f"[LLM] content='{content[:200]}' reasoning_content='{reasoning[:200]}'")
+
+        if content:
+            # 模型把回答放在 content，思考放在 reasoning_content
+            answer, thinking = _parse_thinking(content)
+            if not thinking and reasoning:
+                thinking = reasoning
+            return (answer, thinking)
+        elif reasoning:
+            # 模型把所有内容放在 reasoning_content（如 qwen3.5 开启 thinking 时）
+            return _parse_thinking(reasoning)
+        else:
+            return ("", "")
 
 
 # 全局单例，所有模块 import llm 即可使用
