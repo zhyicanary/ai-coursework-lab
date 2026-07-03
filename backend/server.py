@@ -10,6 +10,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -161,19 +162,58 @@ app.add_middleware(
 # KnowSeeker — RAG 问答与文档管理
 # ═══════════════════════════════════════════════════════════
 
+# 异步任务存储
+_tasks: dict[str, dict] = {}
+_tasks_lock = asyncio.Lock()
+
+
+async def _run_rag_task(task_id: str, question: str):
+    """后台执行 RAG 查询，逐步更新任务状态。"""
+    try:
+        async with _tasks_lock:
+            _tasks[task_id]["status"] = "processing"
+            _tasks[task_id]["progress"] = 0.1
+
+        result = await run_rag_query(question)
+
+        async with _tasks_lock:
+            _tasks[task_id].update(
+                {
+                    "status": "completed",
+                    "progress": 1.0,
+                    "answer": result.get("answer", ""),
+                    "thinking_trace": result.get("thinking_trace", []),
+                    "citations": result.get("citations", []),
+                }
+            )
+    except Exception as e:
+        async with _tasks_lock:
+            _tasks[task_id].update({"status": "error", "progress": 1.0, "error": str(e)})
+
 
 @app.post("/api/chat")
 async def chat(request: ChatRequest):
-    """RAG 问答：对已索引文档进行智能检索回答。"""
-    try:
-        result = await run_rag_query(request.question)
-        return {
-            "answer": result.get("answer", ""),
-            "thinking_trace": result.get("thinking_trace", []),
-            "citations": result.get("citations", []),
+    """RAG 问答：创建异步任务，立即返回 taskId。"""
+    task_id = uuid.uuid4().hex[:12]
+    async with _tasks_lock:
+        _tasks[task_id] = {
+            "status": "pending",
+            "progress": 0.0,
+            "question": request.question,
         }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    # 启动后台任务
+    asyncio.create_task(_run_rag_task(task_id, request.question))
+    return {"taskId": task_id}
+
+
+@app.get("/api/chat/{task_id}")
+async def get_chat_task(task_id: str):
+    """获取异步 RAG 任务状态和结果。"""
+    async with _tasks_lock:
+        task = _tasks.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    return task
 
 
 @app.post("/api/documents/upload")

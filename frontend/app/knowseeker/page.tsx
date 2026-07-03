@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   AlertCircle,
   Brain,
@@ -38,6 +39,8 @@ import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Tooltip,
@@ -46,6 +49,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { toast } from "sonner";
+import { useKnowSeeker } from "@/lib/knowseeker-context";
+import type { ChatMessage } from "@/lib/knowseeker-context";
 
 const API_BASE = "http://localhost:8000/api";
 
@@ -54,13 +59,6 @@ interface DocumentItem {
   doc_id: string;
   file_name: string;
   chunks_count: number;
-}
-
-interface ChatMessage {
-  role: "user" | "assistant";
-  content: string;
-  thinking_trace?: { step: string; content: string; detail?: string }[];
-  citations?: { doc_name: string; content?: string }[];
 }
 
 const iconMap: Record<string, { icon: string; color: string; label: string }> = {
@@ -78,18 +76,39 @@ const SUGGESTIONS = [
 ];
 
 export default function KnowSeekerPage() {
+  return (
+    <Suspense fallback={null}>
+      <KnowSeekerPageInner />
+    </Suspense>
+  );
+}
+
+function KnowSeekerPageInner() {
+  const { messages, isLoading, error, sendMessage, restoreTask, setError } =
+    useKnowSeeker();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const taskId = searchParams.get("taskId");
+
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isFetchingDocs, setIsFetchingDocs] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const recoveryDoneRef = useRef(false);
 
+  // ── URL 恢复：页面上有 taskId → 轮询后端 ──────────────
+  useEffect(() => {
+    if (taskId && !recoveryDoneRef.current) {
+      recoveryDoneRef.current = true;
+      restoreTask(taskId);
+    }
+  }, [taskId, restoreTask]);
+
+  // ── 文档列表加载 ──────────────────────────────────────
   const loadDocuments = useCallback(async () => {
     setIsFetchingDocs(true);
     try {
@@ -112,6 +131,7 @@ export default function KnowSeekerPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
 
+  // ── 文件上传 ──────────────────────────────────────────
   const handleUploadClick = () => fileInputRef.current?.click();
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -165,34 +185,15 @@ export default function KnowSeekerPage() {
     }
   };
 
+  // ── 发送消息 ──────────────────────────────────────────
   const handleSend = async (text?: string) => {
     const question = (text ?? input).trim();
     if (!question || isLoading) return;
     setInput("");
     setError(null);
-    setMessages((prev) => [...prev, { role: "user", content: question }]);
-    setIsLoading(true);
-    try {
-      const res = await fetch(`${API_BASE}/chat`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question }),
-      });
-      if (!res.ok) throw new Error("获取回答失败");
-      const data = await res.json();
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content: data.answer ?? "",
-          thinking_trace: data.thinking_trace,
-          citations: data.citations,
-        },
-      ]);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "发生错误");
-    } finally {
-      setIsLoading(false);
+    const newTaskId = await sendMessage(question);
+    if (newTaskId) {
+      router.replace(`/knowseeker?taskId=${newTaskId}`);
     }
   };
 
@@ -474,7 +475,47 @@ function MessageBubble({ message }: { message: ChatMessage }) {
               : "rounded-2xl rounded-bl-sm bg-muted px-4 py-2.5 text-sm"
           }
         >
-          <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
+          {typeof message.content === "string" && message.content ? (
+            <div className="leading-relaxed">
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              components={{
+                p: ({ children }) => (
+                  <p className="mb-1 last:mb-0">{children}</p>
+                ),
+                strong: ({ children }) => (
+                  <strong className="font-semibold">{children}</strong>
+                ),
+                ul: ({ children }) => (
+                  <ul className="mb-1 list-disc pl-5 last:mb-0 [&:first-child]:mt-0">
+                    {children}
+                  </ul>
+                ),
+                ol: ({ children }) => (
+                  <ol className="mb-1 list-decimal pl-5 last:mb-0">
+                    {children}
+                  </ol>
+                ),
+                code: ({ children }) => (
+                  <code className="rounded bg-muted px-1 py-0.5 text-sm">
+                    {children}
+                  </code>
+                ),
+                pre: ({ children }) => (
+                  <pre className="mb-1 overflow-x-auto rounded-md bg-muted p-3 text-sm last:mb-0">
+                    {children}
+                  </pre>
+                ),
+              }}
+            >
+              {message.content}
+            </ReactMarkdown>
+            </div>
+          ) : (
+            <p className="whitespace-pre-wrap leading-relaxed">
+              {message.content}
+            </p>
+          )}
         </div>
         {!isUser &&
           message.thinking_trace &&

@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
 import { Toaster } from "@/components/ui/sonner";
+import { KnowSeekerProvider } from "@/lib/knowseeker-context";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -89,6 +90,7 @@ export default function RootLayout({
     return (
         <html lang="zh-CN" suppressHydrationWarning>
             <body className={inter.className}>
+                <KnowSeekerProvider>
                 <SidebarProvider defaultOpen>
                     <AppSidebar />
                     <SidebarInset>
@@ -138,6 +140,7 @@ export default function RootLayout({
                         <main className="flex-1">{children}</main>
                     </SidebarInset>
                 </SidebarProvider>
+                </KnowSeekerProvider>
                 <Toaster />
             </body>
         </html>
