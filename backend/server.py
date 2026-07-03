@@ -183,6 +183,7 @@ async def _run_rag_task(task_id: str, question: str):
                     "progress": 1.0,
                     "answer": result.get("answer", ""),
                     "thinking_trace": result.get("thinking_trace", []),
+                    "llm_thinking": result.get("llm_thinking", []),
                     "citations": result.get("citations", []),
                 }
             )

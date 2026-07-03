@@ -1,4 +1,5 @@
 import os
+import re
 from pathlib import Path
 
 from dotenv import load_dotenv, set_key
@@ -8,6 +9,34 @@ from openai import AsyncOpenAI
 ENV_FILE = Path(__file__).parent.parent / ".env"
 
 load_dotenv(override=True)
+
+
+def _parse_thinking(content: str) -> tuple[str, str]:
+    """从 LLM 输出中拆分思考过程与最终回答。
+
+    支持的格式：
+    - Thinking...\\n...\\n...done thinking.\\n\\n回答
+    - <think>...</think>回答
+    - <think>...</think>（无回答时只返回思考）
+    """
+    content = content.strip()
+
+    # 格式1: Thinking... ...done thinking.
+    m = re.match(
+        r"Thinking\.\.\.\s*\n(.*?)\n\.\.\.done thinking\.\s*\n*(.*)",
+        content,
+        re.DOTALL,
+    )
+    if m:
+        return (m.group(2).strip(), m.group(1).strip())
+
+    # 格式2: <think>...</think>answer
+    m = re.match(r"<think>(.*?)</think>(.*)", content, re.DOTALL)
+    if m:
+        return (m.group(2).strip(), m.group(1).strip())
+
+    # 无思考块，原样返回
+    return (content, "")
 
 
 class LLMClient:
@@ -131,6 +160,28 @@ class LLMClient:
             max_tokens=max_tokens,
         )
         return response.choices[0].message.content
+
+    async def chat_completion_thinking(
+        self,
+        messages: list[dict],
+        model: str | None = None,
+        temperature: float = 0.7,
+        max_tokens: int = 2000,
+    ) -> tuple[str, str]:
+        """调用 LLM 并拆分思考过程与最终回答。
+
+        返回 (answer, thinking):
+          - answer: 模型最终输出（去掉思考块）
+          - thinking: 模型思考过程文本（无思考块时为空字符串）
+        """
+        response = await self.client.chat.completions.create(
+            model=model or self.model,
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
+        content = response.choices[0].message.content or ""
+        return _parse_thinking(content)
 
 
 # 全局单例，所有模块 import llm 即可使用

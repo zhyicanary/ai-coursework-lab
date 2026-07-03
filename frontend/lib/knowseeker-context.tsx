@@ -14,6 +14,7 @@ export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   thinking_trace?: { step: string; content: string; detail?: string }[];
+  llm_thinking?: string[];
   citations?: { doc_name: string; content?: string }[];
 }
 
@@ -100,6 +101,7 @@ export function KnowSeekerProvider({
         const res = await fetch(`${API_BASE}/chat/${taskId}`);
         if (!res.ok) throw new Error("任务不存在");
         const task = await res.json();
+        console.log("[restoreTask] GET response:", task);
 
         if (task.status === "completed") {
           setMessages((prev) => {
@@ -112,6 +114,7 @@ export function KnowSeekerProvider({
               role: "assistant",
               content: task.answer ?? "",
               thinking_trace: task.thinking_trace,
+              llm_thinking: task.llm_thinking,
               citations: task.citations,
             });
             return msgs;

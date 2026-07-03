@@ -98,13 +98,18 @@ function KnowSeekerPageInner() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const recoveryDoneRef = useRef(false);
+  const recoveryDoneRef = useRef<string | null>(null); // 存当前轮询的 taskId
 
   // ── URL 恢复：页面上有 taskId → 轮询后端 ──────────────
   useEffect(() => {
-    if (taskId && !recoveryDoneRef.current) {
-      recoveryDoneRef.current = true;
-      restoreTask(taskId);
+    if (taskId && recoveryDoneRef.current !== taskId) {
+      recoveryDoneRef.current = taskId;
+      restoreTask(taskId).finally(() => {
+        // 只有当前 taskId 仍然匹配时才清除标记
+        if (recoveryDoneRef.current === taskId) {
+          recoveryDoneRef.current = null;
+        }
+      });
     }
   }, [taskId, restoreTask]);
 
@@ -522,6 +527,11 @@ function MessageBubble({ message }: { message: ChatMessage }) {
           message.thinking_trace.length > 0 && (
             <ThinkingTrace trace={message.thinking_trace} />
           )}
+        {!isUser &&
+          message.llm_thinking &&
+          message.llm_thinking.length > 0 && (
+            <LLMThinking thinking={message.llm_thinking} />
+          )}
         {!isUser && message.citations && message.citations.length > 0 && (
           <Citations citations={message.citations} />
         )}
@@ -581,6 +591,41 @@ function ThinkingTrace({
                   </div>
                 );
               })}
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
+    </div>
+  );
+}
+
+function LLMThinking({
+  thinking,
+}: {
+  thinking: string[];
+}) {
+  return (
+    <div className="w-full rounded-lg border bg-background">
+      <Accordion type="single" collapsible>
+        <AccordionItem value="llm-thinking" className="border-b-0">
+          <AccordionTrigger className="px-3 py-2 text-sm hover:no-underline">
+            <div className="flex items-center gap-2">
+              <Brain className="size-4 text-cyan-500" />
+              <span className="font-medium">模型思考</span>
+              <Badge variant="secondary" className="text-xs font-normal">
+                {thinking.length} 轮
+              </Badge>
+            </div>
+          </AccordionTrigger>
+          <AccordionContent className="px-3 pb-3 pt-0">
+            <div className="flex flex-col gap-3">
+              {thinking.map((content, i) => (
+                <div key={i} className="rounded-md bg-muted/60 p-3">
+                  <p className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
+                    {content}
+                  </p>
+                </div>
+              ))}
             </div>
           </AccordionContent>
         </AccordionItem>

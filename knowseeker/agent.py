@@ -77,6 +77,7 @@ class AgentState(TypedDict):
     answer: str  # 最终回答
     citations: list  # 引用来源 [{chunk_text, doc_name}]
     thinking_trace: list  # 推理过程（供前端可视化）
+    llm_thinking: list  # 模型思考过程（供前端展示）
     _round: int  # 当前检索轮次（内部使用）
 
 
@@ -90,6 +91,7 @@ def init_state(question: str) -> AgentState:
         "answer": "",
         "citations": [],
         "thinking_trace": [],
+        "llm_thinking": [],
         "_round": 0,
     }
 
@@ -172,7 +174,7 @@ async def analyze_question(state: AgentState) -> AgentState:
     trace = state.get("thinking_trace", [])
 
     try:
-        resp = await llm.chat_completion(
+        resp, thinking = await llm.chat_completion_thinking(
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": f"用户问题：{state['question']}"},
@@ -190,6 +192,8 @@ async def analyze_question(state: AgentState) -> AgentState:
             "content": f"📋 分析问题：{plan.get('reasoning', '')}",
             "detail": f"关键词：{', '.join(plan.get('keywords', []))}  策略：{plan.get('strategy', 'single')}  最大轮次：{plan.get('num_rounds', 1)}",
         })
+        if thinking:
+            state.setdefault("llm_thinking", []).append(f"[分析问题] {thinking}")
     except Exception as e:
         # LLM 失败时的兜底计划
         state["search_plan"] = {
@@ -335,8 +339,9 @@ async def evaluate_results(state: AgentState) -> AgentState:
     for r in history[-1].get("top_chunks", []):
         results_text += f"- {r.get('content', '')[:200]}...\n"
 
+    thinking = ""
     try:
-        resp = await llm.chat_completion(
+        resp, thinking = await llm.chat_completion_thinking(
             messages=[
                 {"role": "system", "content": EVALUATE_PROMPT.format(
                     question=state["question"],
@@ -373,6 +378,8 @@ async def evaluate_results(state: AgentState) -> AgentState:
             "detail": "",
         })
 
+    if thinking:
+        state.setdefault("llm_thinking", []).append(f"[评估结果] {thinking}")
     state["thinking_trace"] = trace
     return state
 
@@ -392,8 +399,9 @@ async def reformulate(state: AgentState) -> AgentState:
         for r in history[-1]["top_chunks"][:2]:
             results_summary += f"- {r.get('content', '')[:150]}...\n"
 
+    thinking = ""
     try:
-        resp = await llm.chat_completion(
+        resp, thinking = await llm.chat_completion_thinking(
             messages=[
                 {"role": "system", "content": REFORMULATE_PROMPT.format(
                     question=state["question"],
@@ -431,6 +439,8 @@ async def reformulate(state: AgentState) -> AgentState:
             "detail": f"新关键词：{', '.join(new_keywords)}",
         })
 
+    if thinking:
+        state.setdefault("llm_thinking", []).append(f"[重构检索] {thinking}")
     state["thinking_trace"] = trace
     return state
 
@@ -453,8 +463,9 @@ async def generate_answer(state: AgentState) -> AgentState:
         state["thinking_trace"] = trace
         return state
 
+    thinking = ""
     try:
-        resp = await llm.chat_completion(
+        resp, thinking = await llm.chat_completion_thinking(
             messages=[
                 {"role": "system", "content": GENERATE_PROMPT.format(
                     question=state["question"],
@@ -490,6 +501,8 @@ async def generate_answer(state: AgentState) -> AgentState:
             "detail": "",
         })
 
+    if thinking:
+        state.setdefault("llm_thinking", []).append(f"[生成回答] {thinking}")
     state["citations"] = citations_list
     state["thinking_trace"] = trace
     return state
