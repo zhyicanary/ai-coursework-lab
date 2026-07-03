@@ -104,14 +104,15 @@ function KnowSeekerPageInner() {
   useEffect(() => {
     if (taskId && recoveryDoneRef.current !== taskId) {
       recoveryDoneRef.current = taskId;
-      restoreTask(taskId).finally(() => {
-        // 只有当前 taskId 仍然匹配时才清除标记
-        if (recoveryDoneRef.current === taskId) {
+      restoreTask(taskId).then((found) => {
+        if (!found && recoveryDoneRef.current === taskId) {
           recoveryDoneRef.current = null;
+          // 任务不存在（后端重启），清除 URL 参数回到初始状态
+          router.replace("/knowseeker");
         }
       });
     }
-  }, [taskId, restoreTask]);
+  }, [taskId, restoreTask, router]);
 
   // ── 文档列表加载 ──────────────────────────────────────
   const loadDocuments = useCallback(async () => {

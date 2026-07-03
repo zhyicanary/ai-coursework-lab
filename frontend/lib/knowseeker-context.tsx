@@ -89,8 +89,8 @@ export function KnowSeekerProvider({
     }
   }, []);
 
-  const restoreTask = useCallback(async (taskId: string) => {
-    if (pollingRef.current) return; // 已在轮询
+  const restoreTask = useCallback(async (taskId: string): Promise<boolean> => {
+    if (pollingRef.current) return false; // 已在轮询
     pollingRef.current = true;
     setError(null);
     setIsLoading(true);
@@ -99,7 +99,12 @@ export function KnowSeekerProvider({
     try {
       while (true) {
         const res = await fetch(`${API_BASE}/chat/${taskId}`);
-        if (!res.ok) throw new Error("任务不存在");
+        if (!res.ok) {
+          // 任务不存在（后端重启或过期），静默退出，让用户重新提问
+          setIsLoading(false);
+          setProgress(0);
+          return false;
+        }
         const task = await res.json();
         console.log("[restoreTask] GET response:", task);
 
@@ -121,14 +126,14 @@ export function KnowSeekerProvider({
           });
           setProgress(1);
           setIsLoading(false);
-          return;
+          return true;
         }
 
         if (task.status === "error") {
           setError(task.error ?? "任务执行失败");
           setProgress(1);
           setIsLoading(false);
-          return;
+          return true;
         }
 
         // 还在处理中
@@ -138,6 +143,7 @@ export function KnowSeekerProvider({
     } catch (err) {
       setError(err instanceof Error ? err.message : "恢复任务失败");
       setIsLoading(false);
+      return false;
     } finally {
       pollingRef.current = false;
     }
