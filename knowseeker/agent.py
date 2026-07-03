@@ -8,12 +8,60 @@
                           └→ generate_answer → END
 """
 
+import json
+import re
 from typing import Literal, TypedDict
 
 from langgraph.graph import END, START, StateGraph
 
 from common.llm_client import llm
 from knowseeker.rag_chain import search_with_rerank
+
+
+def _extract_json(text: str) -> str:
+    """从 LLM 回复中提取 JSON 字符串，支持常见包装格式。
+
+    处理情况：
+    - ```json\n{...}\n```
+    - ```\n{...}\n```
+    - 前置/后置文字 + {...}
+    - 纯 JSON 文本
+
+    Raises:
+        ValueError: 无法从文本中提取合法 JSON。
+    """
+    text = text.strip()
+
+    # 1. 优先提取 ```json 或 ``` 代码块中的内容
+    for pattern in [r'```json\s*([\s\S]*?)```', r'```\s*([\s\S]*?)```']:
+        match = re.search(pattern, text)
+        if match:
+            candidate = match.group(1).strip()
+            try:
+                json.loads(candidate)
+                return candidate
+            except json.JSONDecodeError:
+                continue
+
+    # 2. 尝试直接解析全文本
+    try:
+        json.loads(text)
+        return text
+    except json.JSONDecodeError:
+        pass
+
+    # 3. 兜底：找到第一个 { 和最后一个 } 截取
+    start = text.find("{")
+    end = text.rfind("}")
+    if start != -1 and end != -1 and end > start:
+        candidate = text[start : end + 1]
+        try:
+            json.loads(candidate)
+            return candidate
+        except json.JSONDecodeError:
+            pass
+
+    raise ValueError(f"无法从 LLM 回复中提取 JSON:\n{text[:500]}")
 
 # ── Agent 状态定义 ────────────────────────────────────────
 
@@ -132,9 +180,8 @@ async def analyze_question(state: AgentState) -> AgentState:
             temperature=0.3,
             max_tokens=500,
         )
-        # 清理可能的 markdown 代码块标记
-        cleaned = resp.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
-        import json
+        # 从 LLM 回复中提取 JSON（兼容代码块包装、前后缀文字等）
+        cleaned = _extract_json(resp)
         plan = json.loads(cleaned)
 
         state["search_plan"] = plan
@@ -300,8 +347,7 @@ async def evaluate_results(state: AgentState) -> AgentState:
             temperature=0.3,
             max_tokens=300,
         )
-        cleaned = resp.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
-        import json
+        cleaned = _extract_json(resp)
         evaluation = json.loads(cleaned)
 
         state["need_more_search"] = not evaluation.get("sufficient", True)
@@ -361,8 +407,7 @@ async def reformulate(state: AgentState) -> AgentState:
             temperature=0.5,
             max_tokens=300,
         )
-        cleaned = resp.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
-        import json
+        cleaned = _extract_json(resp)
         new_plan = json.loads(cleaned)
 
         # 更新 search_plan 中的关键词
