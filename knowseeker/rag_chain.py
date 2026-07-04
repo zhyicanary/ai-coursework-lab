@@ -12,10 +12,9 @@ import time
 from pathlib import Path
 from typing import IO
 
-from common.bm25_store import bm25_store
+from common.context import get_context
 from common.document_loader import Document, chunk_documents, load
-from common.reranker import reranker
-from common.vector_store import add_documents, client, init_collection, search_documents
+from common.vector_store import add_documents, init_collection, search_documents
 
 
 def index_document(
@@ -61,7 +60,7 @@ def index_document(
     add_documents(doc_id=doc_id, documents=docs_for_store, texts=texts)
 
     # 6. 同步到 BM25 索引
-    bm25_store.add_texts(texts, [d["metadata"] for d in docs_for_store])
+    get_context().bm25_store.add_texts(texts, [d["metadata"] for d in docs_for_store])
 
     return {
         "doc_id": doc_id,
@@ -149,7 +148,7 @@ def search_with_rerank(
     """
     # 第一阶段：稠密向量粗召回 + BM25 稀疏检索
     dense_candidates = search_documents(query=query, top_k=recall_k)
-    sparse_candidates = bm25_store.search(query=query, top_k=recall_k)
+    sparse_candidates = get_context().bm25_store.search(query=query, top_k=recall_k)
 
     if not dense_candidates and not sparse_candidates:
         return [], {"recall_count": 0, "rerank_count": 0, "reranked": False}
@@ -165,7 +164,7 @@ def search_with_rerank(
 
     # 第二阶段：Cross-Encoder 精排序
     try:
-        reranked = reranker.rerank(query=query, documents=candidates, top_k=top_k)
+        reranked = get_context().reranker.rerank(query=query, documents=candidates, top_k=top_k)
         reranked_flag = True
     except Exception:
         # Reranker 失败时降级：直接用向量检索结果
@@ -223,5 +222,5 @@ def delete_document(doc_id: str) -> bool:
 
     if ids_to_delete:
         col.delete(ids=ids_to_delete)
-        bm25_store.mark_dirty()
+        get_context().bm25_store.mark_dirty()
     return len(ids_to_delete) > 0

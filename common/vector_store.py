@@ -2,14 +2,9 @@ from pathlib import Path
 
 import chromadb
 
-from common.embedding_client import embedding
+from common.context import get_context
 
-# 持久化目录
-DATA_DIR = Path(__file__).parent.parent / "data" / "chromadb"
-DATA_DIR.mkdir(parents=True, exist_ok=True)
-
-# 全局单例
-client = chromadb.PersistentClient(path=str(DATA_DIR))
+# ChromaDB 客户端通过 get_context().chroma_client 获取
 
 
 def init_collection(collection_name: str = "default"):
@@ -18,7 +13,8 @@ def init_collection(collection_name: str = "default"):
     Args:
         collection_name: collection 名称，不同项目使用不同名称避免冲突
     """
-    return client.get_or_create_collection(
+    ctx = get_context()
+    return ctx.chroma_client.get_or_create_collection(
         name=collection_name,
         metadata={"hnsw:space": "cosine"},
     )
@@ -53,7 +49,8 @@ def add_attractions(
     ]
 
     # 使用 embedding 客户端生成向量
-    embeddings = embedding.embed_texts(texts)
+    ctx = get_context()
+    embeddings = ctx.embedding.embed_texts(texts)
 
     collection.upsert(
         ids=ids,
@@ -88,7 +85,8 @@ def search_attractions(
     where = {"city": city}
 
     # 生成查询向量
-    query_embedding = embedding.embed_query(query)
+    ctx = get_context()
+    query_embedding = ctx.embedding.embed_query(query)
 
     results = collection.query(
         query_embeddings=[query_embedding],
@@ -150,7 +148,8 @@ def add_documents(
         for i, doc in enumerate(documents)
     ]
 
-    embeddings = embedding.embed_texts(texts)
+    ctx = get_context()
+    embeddings = ctx.embedding.embed_texts(texts)
 
     collection.upsert(
         ids=ids,
@@ -177,7 +176,8 @@ def search_documents(
     """
     collection = init_collection(collection_name)
 
-    query_embedding = embedding.embed_query(query)
+    ctx = get_context()
+    query_embedding = ctx.embedding.embed_query(query)
 
     results = collection.query(
         query_embeddings=[query_embedding],

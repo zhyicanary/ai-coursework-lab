@@ -57,5 +57,4 @@ class EmbeddingClient:
         return self.embed_texts([text])[0]
 
 
-# 全局单例
-embedding = EmbeddingClient()
+# 实例通过 common.context.get_context().embedding 获取，不再提供模块级单例

@@ -6,7 +6,7 @@
 from abc import ABC, abstractmethod
 from typing import Any
 
-from common.llm_client import llm
+from common.context import get_context
 from common.mcp_server.client import call_tool as mcp_call_tool
 
 
@@ -49,7 +49,7 @@ class BaseAgent(ABC):
         Returns:
             LLM 返回的文本
         """
-        return await llm.chat_completion(
+        return await get_context().llm.chat_completion(
             messages=messages,
             temperature=temperature,
             max_tokens=max_tokens,

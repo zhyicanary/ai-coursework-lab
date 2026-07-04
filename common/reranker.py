@@ -112,5 +112,4 @@ class RerankerClient:
         return scored[:top_k]
 
 
-# 全局单例
-reranker = RerankerClient()
+# 实例通过 common.context.get_context().reranker 获取，不再提供模块级单例

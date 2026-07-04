@@ -25,9 +25,9 @@ from common.vector_store import add_attractions
 def _check_embedding() -> bool:
     """检查 Embedding 服务是否可用。"""
     try:
-        from common.embedding_client import embedding
+        from common.context import get_context
 
-        embedding.embed_texts(["测试"])
+        get_context().embedding.embed_texts(["测试"])
         return True
     except Exception as e:
         print(f"⚠️  Embedding 服务不可用：{e}")

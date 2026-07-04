@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import gradio as gr
 
-from common.llm_client import llm
+from common.context import get_context
 from tripmind.orchestrator import (
     adjust_plan,
     run_travel_planner,
@@ -27,15 +27,15 @@ def update_settings(backend, model, api_key, base_url):
     if backend == "deepseek" and not api_key:
         gr.Warning("DeepSeek 后端必须填写 API Key")
         return "请填写 API Key"
-    llm.update(backend=backend, model=model, api_key=api_key, base_url=base_url)
+    get_context().llm.update(backend=backend, model=model, api_key=api_key, base_url=base_url)
     gr.Info(f"✅ 配置已保存 — {backend} / {model}")
     return f"当前: {backend} / {model}"
 
 
 async def refresh_model_list(backend):
     """后台异步拉取模型列表并更新下拉框（被 .then() 触发，不阻塞 UI）。"""
-    cfg = llm.get_config()
-    models = await llm.list_models()
+    cfg = get_context().llm.get_config()
+    models = await get_context().llm.list_models()
     saved = cfg["model"]
     if saved and saved not in models:
         models.insert(0, saved)
@@ -47,7 +47,7 @@ async def refresh_model_list(backend):
 
 def on_backend_change(backend):
     """后端切换：瞬间返回默认值（不联网拉模型，避免 UI 卡 loading）。"""
-    cfg = llm.get_config()
+    cfg = get_context().llm.get_config()
     if backend == "ollama":
         saved = cfg["model"] if cfg["backend"] == "ollama" else None
         default_model = saved or "gemma4:latest"
@@ -72,7 +72,7 @@ def on_backend_change(backend):
 
 def get_config():
     """页面加载时回显当前配置（快速返回，不触发网络请求）。"""
-    cfg = llm.get_config()
+    cfg = get_context().llm.get_config()
     is_ollama = cfg["backend"] == "ollama"
     # 只显示已保存的模型，不联网拉取
     saved_model = cfg["model"]
@@ -324,7 +324,7 @@ async def chat(message, history):
         messages.append({"role": h["role"], "content": h["content"]})
     messages.append({"role": "user", "content": message})
 
-    reply = await llm.chat_completion(messages)
+    reply = await get_context().llm.chat_completion(messages)
 
     # 返回完整历史（Gradio Chatbot 要求 list[dict] 格式）
     history.append({"role": "user", "content": message})

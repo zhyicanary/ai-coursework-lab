@@ -14,7 +14,7 @@ from typing import Literal, TypedDict
 
 from langgraph.graph import END, START, StateGraph
 
-from common.llm_client import llm
+from common.context import get_context
 from knowseeker.rag_chain import search_with_rerank
 
 
@@ -174,7 +174,7 @@ async def analyze_question(state: AgentState) -> AgentState:
     trace = state.get("thinking_trace", [])
 
     try:
-        resp, thinking = await llm.chat_completion_thinking(
+        resp, thinking = await get_context().llm.chat_completion_thinking(
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": f"用户问题：{state['question']}"},
@@ -341,7 +341,7 @@ async def evaluate_results(state: AgentState) -> AgentState:
 
     thinking = ""
     try:
-        resp, thinking = await llm.chat_completion_thinking(
+        resp, thinking = await get_context().llm.chat_completion_thinking(
             messages=[
                 {"role": "system", "content": EVALUATE_PROMPT.format(
                     question=state["question"],
@@ -401,7 +401,7 @@ async def reformulate(state: AgentState) -> AgentState:
 
     thinking = ""
     try:
-        resp, thinking = await llm.chat_completion_thinking(
+        resp, thinking = await get_context().llm.chat_completion_thinking(
             messages=[
                 {"role": "system", "content": REFORMULATE_PROMPT.format(
                     question=state["question"],
@@ -465,7 +465,7 @@ async def generate_answer(state: AgentState) -> AgentState:
 
     thinking = ""
     try:
-        resp, thinking = await llm.chat_completion_thinking(
+        resp, thinking = await get_context().llm.chat_completion_thinking(
             messages=[
                 {"role": "system", "content": GENERATE_PROMPT.format(
                     question=state["question"],

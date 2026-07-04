@@ -200,5 +200,4 @@ class LLMClient:
             return ("", "")
 
 
-# 全局单例，所有模块 import llm 即可使用
-llm = LLMClient()
+# 实例通过 common.context.get_context().llm 获取，不再提供模块级单例

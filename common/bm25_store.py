@@ -235,5 +235,4 @@ class BM25Store:
         self._ready = False
 
 
-# 全局单例
-bm25_store = BM25Store()
+# 实例通过 common.context.get_context().bm25_store 获取，不再提供模块级单例

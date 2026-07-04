@@ -79,14 +79,7 @@ async def call_tool_via_http(name: str, arguments: dict | None = None) -> Any:
             return parsed
 
 
-# MCP HTTP 可用状态缓存
-# True  = HTTP Server 可用，优先使用
-# False = HTTP Server 不可用，回退到直接调用
-# None  = 尚未探测
-_mcp_available: bool | None = None
-# 连续失败计数，超过阈值后降级
-_http_fail_count: int = 0
-_MAX_HTTP_FAILS = 3
+from common.context import get_context
 
 
 async def call_tool(name: str, arguments: dict | None = None) -> Any:
@@ -97,34 +90,31 @@ async def call_tool(name: str, arguments: dict | None = None) -> Any:
 
     这是 Agent 调用工具的推荐入口。
     """
-    global _mcp_available, _http_fail_count
+    ctx = get_context()
 
     # 已确认 HTTP 不可用，直接回退
-    if _mcp_available is False:
+    if ctx.mcp_available is False:
         return await call_tool_direct(name, arguments)
 
     # 首次探测或之前成功过
     try:
         result = await call_tool_via_http(name, arguments)
-        _mcp_available = True
-        _http_fail_count = 0
+        ctx.mark_mcp_success()
         return result
     except Exception as e:
-        _http_fail_count += 1
-        if _mcp_available is None:
+        if ctx.mcp_available is None:
             print(
                 f"[MCP] {name} 通过 HTTP 失败 ({e.__class__.__name__})，"
                 f"已回退到直接调用（将重试 HTTP）"
             )
-        elif _http_fail_count >= _MAX_HTTP_FAILS:
-            _mcp_available = False
+        elif ctx.mark_mcp_failure():
             print(
-                f"[MCP] HTTP 连续失败 {_http_fail_count} 次，"
-                f"永久回退到直接调用"
+                f"[MCP] HTTP 连续失败，"
+                f"永久回退到直接调用（可通过 context.reset_mcp_state() 恢复）"
             )
         else:
             print(
                 f"[MCP] {name} HTTP 调用失败 ({e.__class__.__name__})，"
-                f"本次回退到直接调用 ({_http_fail_count}/{_MAX_HTTP_FAILS})"
+                f"本次回退到直接调用"
             )
         return await call_tool_direct(name, arguments)

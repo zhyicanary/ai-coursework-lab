@@ -33,9 +33,7 @@ from tripmind.orchestrator import (
     run_travel_planner_stream,
 )
 from tripmind.types import TravelRequest
-from common.llm_client import llm
-from common.embedding_client import embedding
-from common.reranker import reranker
+from common.context import get_context
 from common.mcp_server.server import MCP_HOST, MCP_PORT
 
 # ── MCP Server 生命周期管理 ──────────────────────────────
@@ -285,7 +283,12 @@ async def travel_plan(request: TravelPlanRequest):
 
 @app.post("/api/travel/plan/stream")
 async def travel_plan_stream(request: TravelPlanRequest):
-    """流式旅行规划：通过 SSE 实时推送各 Agent 进度。"""
+    """流式旅行规划：通过 SSE 实时推送各 Agent 进度。
+
+    编排器内部使用 graph.astream() 按图拓扑顺序推进节点，
+    每个节点完成后 yield 该节点的 Agent 结果。
+    最终 yield __full_state__ 供前端追问调整使用。
+    """
 
     async def event_generator():
         tr: TravelRequest = {
@@ -296,14 +299,8 @@ async def travel_plan_stream(request: TravelPlanRequest):
             "departure_city": request.departure_city,
         }
         try:
-            accumulated: dict = {}
             async for step in run_travel_planner_stream(tr):
-                for k, v in step.items():
-                    accumulated[k] = v
                 yield f"data: {json.dumps(step, ensure_ascii=False)}\n\n"
-            # Emit full accumulated state for adjust endpoint
-            accumulated["request"] = tr
-            yield f"data: {json.dumps({'__full_state__': accumulated}, ensure_ascii=False)}\n\n"
         except Exception as e:
             yield f"data: {json.dumps({'error': str(e)}, ensure_ascii=False)}\n\n"
 
@@ -341,8 +338,8 @@ async def get_models(backend: str | None = None):
     不传则使用当前 llm.backend 的值。
     """
     try:
-        models = await llm.list_models(backend=backend)
-        target = backend or llm.backend
+        models = await get_context().llm.list_models(backend=backend)
+        target = backend or get_context().llm.backend
         return {"backend": target, "models": models}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -352,9 +349,9 @@ async def get_models(backend: str | None = None):
 async def get_settings():
     """获取当前全部模型配置（推理层 + 向量化层 + 重排序层）。"""
     try:
-        llm_config = llm.get_config()
-        emb_config = embedding.get_config()
-        rerank_config = reranker.get_config()
+        llm_config = get_context().llm.get_config()
+        emb_config = get_context().embedding.get_config()
+        rerank_config = get_context().reranker.get_config()
         return {
             # 推理层
             "backend": llm_config.get("backend"),
@@ -384,7 +381,7 @@ async def update_settings(settings: SettingsRequest):
     try:
         # 推理层
         if settings.backend or settings.model or settings.api_key or settings.base_url:
-            llm.update(
+            get_context().llm.update(
                 backend=settings.backend,
                 model=settings.model,
                 api_key=settings.api_key,
@@ -393,14 +390,14 @@ async def update_settings(settings: SettingsRequest):
 
         # 向量化层
         if settings.embedding_model or settings.embedding_base_url:
-            embedding.update(
+            get_context().embedding.update(
                 model=settings.embedding_model,
                 base_url=settings.embedding_base_url,
             )
 
         # 重排序层
         if settings.reranker_model or settings.reranker_enabled is not None:
-            reranker.update(
+            get_context().reranker.update(
                 model=settings.reranker_model,
                 enabled=settings.reranker_enabled,
             )
