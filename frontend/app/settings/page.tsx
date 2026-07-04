@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
     Settings,
     Loader2,
@@ -75,6 +75,7 @@ export default function SettingsPage() {
     const [loading, setLoading] = useState(false);
     const [modelsLoading, setModelsLoading] = useState(false);
     const [backendOnline, setBackendOnline] = useState<boolean | null>(null);
+    const [settingsLoaded, setSettingsLoaded] = useState(false);
 
     const loadSettings = useCallback(async () => {
         try {
@@ -93,6 +94,8 @@ export default function SettingsPage() {
             }
         } catch {
             setBackendOnline(false);
+        } finally {
+            setSettingsLoaded(true);
         }
     }, []);
 
@@ -114,32 +117,55 @@ export default function SettingsPage() {
         }
     }, [backend]);
 
+    // 追踪当前 backend，用于忽略已过期的异步响应
+    const backendRef = useRef(backend);
     useEffect(() => {
+        backendRef.current = backend;
+    }, [backend]);
+
+    useEffect(() => {
+        // 等待 loadSettings 完成再拉模型列表，避免用默认值 "deepseek"
+        // 发起请求后又被真实配置（如 ollama）的响应覆盖
+        if (!settingsLoaded) return;
+
+        const currentBackend = backend;
+        setModelsLoading(true);
+        // 切换后端时清空模型，新列表加载后再选中第一个
+        setModel("");
+
         const fetchModels = async () => {
-            setModelsLoading(true);
             try {
                 const res = await fetch(
-                    `${API_BASE}/api/models?backend=${encodeURIComponent(backend)}`,
+                    `${API_BASE}/api/models?backend=${encodeURIComponent(currentBackend)}`,
                 );
                 if (res.ok) {
                     const data = await res.json();
+                    // 忽略过期的响应：组件已切换到另一个 backend
+                    if (currentBackend !== backendRef.current) return;
                     const list = Array.isArray(data.models) ? data.models : [];
                     setModels(list);
-                    setModel((prev) => prev || list[0] || "");
+                    if (list.length > 0) {
+                        setModel(list[0]);
+                    }
                 }
             } catch {
+                if (currentBackend !== backendRef.current) return;
                 const fallback =
-                    backend === "ollama"
+                    currentBackend === "ollama"
                         ? ["gemma4:latest"]
                         : ["deepseek-v4-flash", "deepseek-v4-pro"];
                 setModels(fallback);
-                setModel((prev) => prev || fallback[0]);
+                if (fallback.length > 0) {
+                    setModel(fallback[0]);
+                }
             } finally {
-                setModelsLoading(false);
+                if (currentBackend === backendRef.current) {
+                    setModelsLoading(false);
+                }
             }
         };
         fetchModels();
-    }, [backend]);
+    }, [backend, settingsLoaded]);
 
     const handleSave = async () => {
         setLoading(true);
