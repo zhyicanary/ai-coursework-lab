@@ -6,11 +6,11 @@
 
 | # | 项目 | 范式 | 前端 | 入口 |
 |---|------|------|------|------|
-| 1 | KnowSeeker | 单 Agent 深度推理 (Agentic RAG) | React + shadcn/ui (方案B) / Streamlit (方案A) | `frontend/` / `knowseeker/app.py` |
-| 2 | TripMind | 多 Agent 协同编排 (Multi-Agent) | React + shadcn/ui (方案B) / Gradio (方案A) | `frontend/` / `tripmind/app.py` |
+| 1 | KnowSeeker | 单 Agent 深度推理 (Agentic RAG) | React + shadcn/ui | `frontend/` |
+| 2 | TripMind | 多 Agent 协同编排 (Multi-Agent) | React + shadcn/ui | `frontend/` |
 
-> **方案 B**（当前主方案）：FastAPI 后端 API + Next.js 14 + React 18 + shadcn/ui + Tailwind CSS，前后端分离，SSE 流式推送。
-> **方案 A**（旧，保留）：Streamlit / Gradio 全栈 Python，直接调用 `common/` 层逻辑。
+> **当前架构**：FastAPI 后端 API + Next.js 14 + React 18 + shadcn/ui + Tailwind CSS，前后端分离，SSE 流式推送。
+> **旧方案 A**（Streamlit / Gradio）已移除，逻辑保留在 `knowseeker/agent.py`、`knowseeker/rag_chain.py`、`tripmind/orchestrator.py` 中，由 FastAPI 后端统一调用。
 
 ## 系统入口
 
@@ -46,34 +46,23 @@ FastAPI (后端, 端口 8000)
     ├── knowseeker/rag_chain.py    # 文档管理
     ├── tripmind/orchestrator.py   # 旅游规划 + SSE 流式
     └── common/llm_client.py       # LLM 设置
-                                   
+    
 MCP Server (端口 8765, FastAPI 生命周期自动管理)
-```
-
-### 方案 A — 全栈 Python（旧，保留可用）
-
-```
-Gradio / Streamlit 前端
-    │
-    ├── tripmind/ ─── orchestrator.py
-    │     └── agents/ ──→ common/mcp_server/client.py
-    │                           ├── Streamable HTTP (8765) → server.py → tools.py
-    │                           └── 直接调用 → tools.py → mock_data/
-    │
-    └── knowseeker/ ─── agent.py
-          └── vector_store.search_documents()
 ```
 
 ### 启动方式
 
 ```bash
-# 方案 A（旧）
-uv run streamlit run knowseeker/app.py          # KnowSeeker
-uv run python tripmind/app.py                   # TripMind
+# 后端 API
+uv run uvicorn backend.server:app --port 8000
+# 或: make backend
 
-# 方案 B（新）
-uv run uvicorn backend.server:app --port 8000   # 后端 API
-cd frontend && npm run dev                      # 前端界面
+# 前端界面
+cd frontend && npm run dev or pnpm dev
+# 或: make frontend
+
+# 单独启动 MCP Server（通常由 FastAPI 自动管理生命周期）
+uv run python -m common.mcp_server.server
 ```
 
 ## 设计模式（全项目级）

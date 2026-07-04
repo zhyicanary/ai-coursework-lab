@@ -214,8 +214,8 @@ uv run uvicorn backend.server:app --host 0.0.0.0 --port 8000
 
 # 前端
 cd frontend
-npm install  # 首次安装依赖
-npm run dev  # 访问 http://localhost:3000
+npm install or pnpm install  # 首次安装依赖
+npm run dev or pnpm dev  # 访问 http://localhost:3000
 ```
 
 ---

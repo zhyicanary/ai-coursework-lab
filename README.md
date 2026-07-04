@@ -76,8 +76,8 @@ uv run uvicorn backend.server:app --host 0.0.0.0 --port 8000
 
 # 2. 启动前端界面
 cd frontend
-npm install   # 首次需要安装依赖
-npm run dev   # 访问 http://localhost:3000
+npm install or pnpm install   # 首次需要安装依赖
+npm run dev or pnpm dev   # 访问 http://localhost:3000
 ```
 
 > 方案B 的后端会自动启动 MCP Server 子进程（端口 8765），无需手动管理。

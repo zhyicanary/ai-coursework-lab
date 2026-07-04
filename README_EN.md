@@ -76,8 +76,8 @@ uv run uvicorn backend.server:app --host 0.0.0.0 --port 8000
 
 # 2. Start frontend
 cd frontend
-npm install   # Required on first run
-npm run dev   # Visit http://localhost:3000
+npm install or pnpm install   # Required on first run
+npm run dev or pnpm dev   # Visit http://localhost:3000
 ```
 
 > Option B backend automatically starts the MCP Server subprocess (port 8765) — no manual management needed.

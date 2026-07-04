@@ -339,9 +339,8 @@ async def evaluate_results(state: AgentState) -> AgentState:
     for r in history[-1].get("top_chunks", []):
         results_text += f"- {r.get('content', '')[:200]}...\n"
 
-    thinking = ""
     try:
-        resp, thinking = await get_context().llm.chat_completion_thinking(
+        resp = await get_context().llm.chat_completion(
             messages=[
                 {"role": "system", "content": EVALUATE_PROMPT.format(
                     question=state["question"],
@@ -350,7 +349,7 @@ async def evaluate_results(state: AgentState) -> AgentState:
                 {"role": "user", "content": "请评估这些检索结果是否足够回答用户问题。"},
             ],
             temperature=0.3,
-            max_tokens=300,
+            max_tokens=1024,
         )
         cleaned = _extract_json(resp)
         evaluation = json.loads(cleaned)
@@ -378,8 +377,6 @@ async def evaluate_results(state: AgentState) -> AgentState:
             "detail": "",
         })
 
-    if thinking:
-        state.setdefault("llm_thinking", []).append(f"[评估结果] {thinking}")
     state["thinking_trace"] = trace
     return state
 
@@ -399,9 +396,8 @@ async def reformulate(state: AgentState) -> AgentState:
         for r in history[-1]["top_chunks"][:2]:
             results_summary += f"- {r.get('content', '')[:150]}...\n"
 
-    thinking = ""
     try:
-        resp, thinking = await get_context().llm.chat_completion_thinking(
+        resp = await get_context().llm.chat_completion(
             messages=[
                 {"role": "system", "content": REFORMULATE_PROMPT.format(
                     question=state["question"],
@@ -413,7 +409,7 @@ async def reformulate(state: AgentState) -> AgentState:
                 {"role": "user", "content": "请从不同角度生成新的搜索关键词。"},
             ],
             temperature=0.5,
-            max_tokens=300,
+            max_tokens=1024,
         )
         cleaned = _extract_json(resp)
         new_plan = json.loads(cleaned)
@@ -439,8 +435,6 @@ async def reformulate(state: AgentState) -> AgentState:
             "detail": f"新关键词：{', '.join(new_keywords)}",
         })
 
-    if thinking:
-        state.setdefault("llm_thinking", []).append(f"[重构检索] {thinking}")
     state["thinking_trace"] = trace
     return state
 
@@ -474,7 +468,7 @@ async def generate_answer(state: AgentState) -> AgentState:
                 {"role": "user", "content": "请基于以上检索结果回答用户问题。"},
             ],
             temperature=0.5,
-            max_tokens=2000,
+            max_tokens=4096,
         )
         answer = resp.strip()
         state["answer"] = answer

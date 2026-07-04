@@ -1,7 +1,10 @@
-.PHONY: knowseeker tripmind
+.PHONY: backend frontend mcp
 
-knowseeker:
-	uv run streamlit run knowseeker/app.py
+backend:
+	uv run uvicorn backend.server:app --host 0.0.0.0 --port 8000 --reload
 
-tripmind:
-	uv run gradio tripmind/app.py
+frontend:
+	cd frontend && npm run dev or pnpm dev
+
+mcp:
+	uv run python -m common.mcp_server.server
