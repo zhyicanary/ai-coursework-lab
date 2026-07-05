@@ -4,24 +4,25 @@
 
 | # | 项目 | 范式 | 前端 | 入口 |
 |---|------|------|------|------|
-| 1 | KnowSeeker | 单 Agent 深度推理 (Agentic RAG) | React + shadcn/ui | `frontend/app/knowseeker/` |
+| 1 | KnowSeeker | 单 Agent 深度推理 (Agentic RAG + 混合检索 + 重排序) | React + shadcn/ui | `frontend/app/knowseeker/` |
 | 2 | TripMind | 多 Agent 协同编排 (Multi-Agent) | React + shadcn/ui + SSE | `frontend/app/tripmind/` |
 
-两个项目共享 `common/` 模块（LLM API、向量库、MCP Server）。后端统一使用 FastAPI + SSE 流式推送，前端使用 Next.js 14 + React 18 + shadcn/ui + Tailwind CSS，前后端分离。
+两个项目共享 `common/` 模块，采用**三层架构**（推理层 + 向量化层 + 重排序层）。后端统一使用 FastAPI + SSE 流式推送，前端使用 Next.js 14 + React 18 + shadcn/ui + Tailwind CSS，前后端分离。
 
 ---
 
 ## 技术栈
 
 - **Python 3.14** + **uv** 包管理
-- **LLM**: DeepSeek API / Ollama（运行时热切换，OpenAI 兼容接口）
-- **Embedding**: Ollama 本地模型（qwen3-embedding:8b）
+- **推理层**: DeepSeek API / Ollama（运行时热切换，OpenAI 兼容接口）
+- **向量化层**: Ollama 本地模型（qwen3-embedding:8b）
+- **重排序层**: sentence-transformers Cross-Encoder（可开关）
+- **稀疏检索**: Okapi BM25（rank-bm25 库）
 - **向量库**: ChromaDB（双集合：attractions + documents）
 - **编排**: LangChain + LangGraph
 - **协议**: MCP (Python MCP SDK, FastMCP)
-- **后端（方案B）**: FastAPI + SSE 流式 + MCP 生命周期自动管理
-- **前端（方案B）**: Next.js 14 + React 18 + shadcn/ui + Tailwind CSS
-
+- **后端**: FastAPI + SSE 流式 + MCP 生命周期自动管理
+- **前端**: Next.js 14 + React 18 + shadcn/ui + Tailwind CSS
 
 ---
 
@@ -30,8 +31,11 @@
 ```
 ai-coursework-lab/
 ├── common/                          # 公共模块
-│   ├── llm_client.py                # LLM 客户端（DeepSeek/Ollama 热切换）
-│   ├── embedding_client.py          # Embedding 客户端（Ollama 本地）
+│   ├── context.py                   # App Context — 全局服务上下文（LLM/Embedding/Reranker/BM25/ChromaDB）
+│   ├── llm_client.py                # 推理层：LLM 客户端（DeepSeek/Ollama 热切换）
+│   ├── embedding_client.py          # 向量化层：Embedding 客户端（Ollama 本地）
+│   ├── reranker.py                  # 重排序层：Cross-Encoder 重排序（sentence-transformers）
+│   ├── bm25_store.py                # 稀疏检索：Okapi BM25（rank-bm25 库）
 │   ├── vector_store.py              # ChromaDB 向量存储操作（双集合）
 │   ├── document_loader.py           # 多格式文档解析与分块
 │   └── mcp_server/
@@ -53,17 +57,19 @@ ai-coursework-lab/
 │               ├── guangzhou.json
 │               └── hangzhou.json
 ├── backend/                         # FastAPI 后端
-│   └── server.py                    # 12 个 REST API 端点 + MCP 生命周期管理
+│   └── server.py                    # 13 个 REST API 端点 + MCP 生命周期管理 + 异步 RAG 任务
 ├── frontend/                        # React 前端
 │   ├── app/                         # Next.js 14 App Router
 │   │   ├── page.tsx                 # 首页（项目导航）
 │   │   ├── knowseeker/page.tsx      # 知识问答界面
 │   │   ├── tripmind/page.tsx        # 旅游规划界面（SSE 流式）
-│   │   ├── settings/page.tsx        # LLM 配置界面
+│   │   ├── settings/page.tsx        # 三层配置界面（推理+向量化+重排序）
 │   │   └── layout.tsx               # 全局布局 + 侧边栏
 │   ├── components/
 │   │   ├── ui/                      # shadcn/ui 组件库
 │   │   └── app-sidebar.tsx          # 应用侧边栏
+│   ├── lib/
+│   │   └── config.ts                # API 基础 URL 配置
 │   └── package.json
 ├── tripmind/                        # 课设二：多 Agent 旅游规划
 │   ├── orchestrator.py              # LangGraph 状态机编排器
@@ -79,7 +85,7 @@ ai-coursework-lab/
 │       └── summarizer.py            # SummarizerAgent：Markdown 方案生成
 ├── knowseeker/                      # 课设一：单 Agent RAG 问答
 │   ├── agent.py                     # LangGraph Agentic RAG 状态机
-│   └── rag_chain.py                 # RAG 管道（加载→分块→向量化→检索）
+│   └── rag_chain.py                 # RAG 管道（混合检索 + RRF 融合 + 重排序）
 ├── design/                          # 设计文档
 │   ├── 01-tech-stack.md
 │   ├── 02-knowseeker.md
@@ -93,6 +99,76 @@ ai-coursework-lab/
 ├── pyproject.toml
 └── README.md
 ```
+
+---
+
+## App Context — 三层架构
+
+`common/context.py` 是全局服务上下文，集中管理所有服务实例，替代模块级单例：
+
+```
+AppContext
+├── llm: LLMClient           # 推理层（DeepSeek/Ollama 热切换）
+├── embedding: EmbeddingClient # 向量化层（Ollama 本地）
+├── reranker: Reranker       # 重排序层（Cross-Encoder，可开关）
+├── bm25: BM25Store          # 稀疏检索（Okapi BM25）
+├── vector_store: VectorStore # 稠密检索（ChromaDB）
+└── mcp_available: bool       # MCP 协议可用状态
+```
+
+获取方式：`from common.context import get_context` → `ctx = get_context()`
+
+三层独立配置，各自持久化到 `.env`：
+- 推理层：`LLM_BACKEND`, `OLLAMA_*`, `DEEPSEEK_*`
+- 向量化层：`EMBEDDING_MODEL`, `OLLAMA_BASE_URL`
+- 重排序层：`RERANKER_MODEL`, `RERANKER_ENABLED`
+
+---
+
+## KnowSeeker 架构详解
+
+### LangGraph 状态流转
+
+```
+analyze_question → retrieve → evaluate_results
+     ↑                          │
+     └──── reformulate ←────────┘  (need_more_search=True)
+                         │
+                         └→ generate_answer → END
+```
+
+- `analyze_question` — LLM 分析问题，生成检索计划（关键词、策略、轮次数）
+- `retrieve` — 混合检索：BM25 + ChromaDB 并行 → RRF 融合 → Cross-Encoder 重排序
+- `evaluate_results` — LLM 判断检索结果是否足够回答
+- `reformulate` — LLM 重构查询关键词，进行第二轮检索
+- `generate_answer` — LLM 综合多轮结果生成回答 + 引用
+
+### 混合检索 + 重排序流程
+
+```
+用户问题
+  ├── BM25 Okapi 稀疏检索 (bm25_store.py)
+  │     关键词匹配，擅长精确术语、专有名词
+  │     → 返回 Top-K 候选
+  │
+  ├── ChromaDB 稠密向量检索 (vector_store.py)
+  │     语义相似度，擅长理解意图、近义表达
+  │     → 返回 Top-K 候选
+  │
+  └── RRF 融合 (rag_chain.py — _hybrid_merge)
+        Reciprocal Rank Fusion: score = Σ 1/(k + rank_i)
+        合并去重，兼顾两种检索优势
+        → 融合候选集
+           │
+           └── Cross-Encoder 重排序 (reranker.py)
+                 sentence-transformers 逐对打分精排
+                 → 返回最终 Top-K
+```
+
+关键文件：
+- `rag_chain.py` — `search()` 调用 `_hybrid_merge()` 执行混合检索 + RRF + 重排序
+- `bm25_store.py` — `search(query, top_k)` 返回 `[{content, score, ...}]`
+- `reranker.py` — `rerank(query, documents, top_k)` 返回精排后的 `[{content, score, ...}]`
 
 ---
 
@@ -152,32 +228,12 @@ Agent.execute(state)
 
 | Agent | 文件 | MCP 工具 | LLM 角色 | 依赖 |
 |-------|------|----------|----------|------|
-| 🌤️ 天气 | `weather.py` | `get_weather` | 穿衣+出行建议 | 无 |
-| ✈️ 交通 | `transport.py` | `search_flights` + `search_trains` | 推荐最优方案 | 无 |
-| 🏨 住宿 | `hotel.py` | `search_hotels` | 按预算筛选推荐 | 无 |
-| 🗺️ 行程 | `itinerary.py` | `search_attractions` | 规划每日行程 | 天气 + 交通 |
-| 💰 预算 | `budget.py` | 无（聚合结果） | 超支分析建议 | 交通 + 住宿 + 行程 |
-| 📝 汇总 | `summarizer.py` | 无（聚合全部结果） | 生成 Markdown 方案 | 全部 |
-
----
-
-## KnowSeeker 架构详解
-
-### LangGraph 状态流转
-
-```
-analyze_question → retrieve → evaluate_results
-     ↑                          │
-     └──── reformulate ←────────┘  (need_more_search=True)
-                         │
-                         └→ generate_answer → END
-```
-
-- `analyze_question` — LLM 分析问题，生成检索计划（关键词、策略、轮次数）
-- `retrieve` — 调用 ChromaDB 向量检索，返回 Top-K 文本块
-- `evaluate_results` — LLM 判断检索结果是否足够回答
-- `reformulate` — LLM 重构查询关键词，进行第二轮检索
-- `generate_answer` — LLM 综合多轮结果生成回答 + 引用
+| 天气 | `weather.py` | `get_weather` | 穿衣+出行建议 | 无 |
+| 交通 | `transport.py` | `search_flights` + `search_trains` | 推荐最优方案 | 无 |
+| 住宿 | `hotel.py` | `search_hotels` | 按预算筛选推荐 | 无 |
+| 行程 | `itinerary.py` | `search_attractions` | 规划每日行程 | 天气 + 交通 |
+| 预算 | `budget.py` | 无（聚合结果） | 超支分析建议 | 交通 + 住宿 + 行程 |
+| 汇总 | `summarizer.py` | 无（聚合全部结果） | 生成 Markdown 方案 | 全部 |
 
 ---
 
@@ -215,13 +271,16 @@ pnpm dev  # 访问 http://localhost:3000
 中文城市名 ↔ 拼音文件名映射（`tools.py` 中 `CITY_NAME_MAP`）：
 北京→beijing, 上海→shanghai, 成都→chengdu, 西安→xian, 广州→guangzhou, 杭州→hangzhou
 
+第三方真实数据源（`smart_plan.py`）：飞猪、高德、同程、途牛。`get_weather` 和 `search_attractions` 支持通过 `.env` 中的 `WEATHER_API_KEY` 和 `AMAP_API_KEY` 接入实时数据。
+
 ---
 
 ## API 端点
 
 | 方法 | 路径 | 功能 |
 |------|------|------|
-| `POST` | `/api/chat` | KnowSeeker RAG 问答 |
+| `POST` | `/api/chat` | 创建 RAG 问答异步任务，返回 `taskId` |
+| `GET` | `/api/chat/{task_id}` | 轮询任务状态和结果 |
 | `POST` | `/api/documents/upload` | 上传文档到知识库 |
 | `GET` | `/api/documents` | 列出已索引文档 |
 | `DELETE` | `/api/documents/{doc_id}` | 删除指定文档 |
@@ -229,8 +288,8 @@ pnpm dev  # 访问 http://localhost:3000
 | `POST` | `/api/travel/plan/stream` | SSE 流式旅行规划 |
 | `POST` | `/api/travel/adjust` | 追问调整旅行方案 |
 | `GET` | `/api/models` | 获取可用模型列表 |
-| `GET` | `/api/settings` | 获取当前 LLM 配置 |
-| `POST` | `/api/settings` | 更新 LLM 配置（持久化到 .env） |
+| `GET` | `/api/settings` | 获取三层配置（推理+向量化+重排序） |
+| `POST` | `/api/settings` | 更新三层配置（持久化到 .env） |
 | `GET` | `/api/health` | 健康检查 |
 
 ---
@@ -240,6 +299,7 @@ pnpm dev  # 访问 http://localhost:3000
 - **Python 3.14** + **uv** 包管理（不用 pip）
 - 类型标注 + 中文注释
 - 配置通过 `.env` + `python-dotenv` 管理
+- **服务获取**：统一通过 `get_context()` 获取 LLM / Embedding / Reranker / BM25 / ChromaDB 实例，不直接导入模块级单例
 - **Agent 开发**：继承 `BaseAgent`，重写 `execute(state)` 方法
   - 数据获取走 `self.call_mcp(tool_name, args)`
   - LLM 处理走 `self.call_llm(messages)`

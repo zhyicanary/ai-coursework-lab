@@ -20,7 +20,7 @@ In 2026, AI Agents are evolving from "calling APIs" to "autonomous decision-maki
 | **Project** | [KnowSeeker](knowseeker/) | [TripMind](tripmind/) |
 | **In one sentence** | Single Agent, multi-step reasoning | Six Agents, collaborative teamwork |
 | **Agent count** | 1 | 6 |
-| **Core mechanism** | Agentic RAG | Multi-Agent DAG scheduling |
+| **Core mechanism** | Agentic RAG + Hybrid Retrieval + Reranking | Multi-Agent DAG scheduling |
 | **Use case** | Knowledge Q&A, document analysis | Complex task decomposition, multi-role collaboration |
 | **Frontend (Option A)** | Streamlit | Gradio |
 | **Frontend (Option B)** | React + shadcn/ui | React + shadcn/ui + SSE streaming |
@@ -76,8 +76,8 @@ uv run uvicorn backend.server:app --host 0.0.0.0 --port 8000
 
 # 2. Start frontend
 cd frontend
-npm install or pnpm install   # Required on first run
-npm run dev or pnpm dev   # Visit http://localhost:3000
+npm install   # Required on first run
+npm run dev   # Visit http://localhost:3000
 ```
 
 > Option B backend automatically starts the MCP Server subprocess (port 8765) — no manual management needed.
@@ -86,37 +86,19 @@ npm run dev or pnpm dev   # Visit http://localhost:3000
 
 ## Project 1: KnowSeeker — MCP-based Agentic RAG Knowledge Assistant
 
-[![View Details](https://img.shields.io/badge/-Documentation-blue)](knowseeker/README_EN.md)
+[![View Details](https://img.shields.io/badge/-Documentation-blue)](knowseeker/README.md)
 
-After a user uploads documents, the Agent autonomously decides whether one retrieval is sufficient or if it should try a different search strategy — unlike traditional RAG's one-shot retrieval.
+After a user uploads documents, the Agent autonomously decides whether one retrieval is sufficient or if it should try a different search strategy. The retrieval stage uses a **hybrid approach**: BM25 sparse retrieval + ChromaDB dense vector retrieval, fused via RRF, then refined by **Cross-Encoder reranking**.
 
-**Core Technology:** LangGraph state machine → analyze → retrieve → evaluate → reformulate → generate
+**Core Technology:** LangGraph state machine → analyze → retrieve (hybrid + RRF + reranking) → evaluate → reformulate → generate
 
-**Course Keywords:** LLM · AI Agent · LangChain · LangGraph · MCP · RAG
-
-```bash
-# Option A
-uv run streamlit run knowseeker/app.py
-
-# Option B (access /knowseeker page via React frontend)
-uv run uvicorn backend.server:app --port 8000
-```
-
-**LangGraph State Flow:**
-
-```
-analyze_question → retrieve → evaluate_results
-     ↑                          │
-     └──── reformulate ←────────┘  (need_more_search=True)
-                         │
-                         └→ generate_answer → END
-```
+**Course Keywords:** LLM · AI Agent · LangChain · LangGraph · MCP · RAG · Hybrid Retrieval · Reranking
 
 ---
 
 ## Project 2: TripMind — Multi-Agent Collaborative Travel Planning System
 
-[![View Details](https://img.shields.io/badge/-Documentation-blue)](tripmind/README_EN.md)
+[![View Details](https://img.shields.io/badge/-Documentation-blue)](tripmind/README.md)
 
 Users input a destination and budget, and 6 AI Agents collaborate like a team — the dispatcher decomposes tasks, the transport Agent searches flights, the hotel Agent compares prices, the itinerary Agent plans routes, the budget Agent controls costs, and the summarizer Agent produces the final plan.
 
@@ -124,48 +106,24 @@ Users input a destination and budget, and 6 AI Agents collaborate like a team �
 
 **Course Keywords:** LLM · AI Agent · LangChain · LangGraph · MCP · RAG · Multi-Agent Collaboration
 
-```bash
-# Option A
-uv run python -m gradio tripmind/app.py --watch-dirs .
-
-# Option B (access /tripmind page via React frontend, with SSE streaming)
-uv run uvicorn backend.server:app --port 8000
-```
-
-**Agent Execution Flow:**
-
-```
-START → orchestrator → parallel (asyncio.gather)
-                        ├── 🌤️ WeatherAgent    (no dependencies)
-                        ├── ✈️ TransportAgent   (no dependencies)
-                        └── 🏨 HotelAgent       (no dependencies)
-                      → planning (sequential)
-                        ├── 🗺️ ItineraryAgent  (depends: weather+transport)
-                        └── 💰 BudgetAgent     (depends: transport+hotel+itinerary)
-                      → route_after_budget
-                        ├── over budget → budget_adjust → summarizer → END
-                        └── within budget → summarizer → END
-```
-
-**Follow-up Adjustment (UC-05):** Users can input instructions like "find a cheaper hotel" — the system automatically identifies affected Agents and only re-runs the relevant parts, preserving unaffected results.
-
 ---
 
 ## Shared Foundation
 
-Both projects share the `common/` module:
+Both projects share the `common/` module, built on a **three-tier architecture** (inference + vectorization + reranking), each tier independently configurable and hot-swappable:
 
 | Module | File | Purpose |
 | --- | --- | --- |
-| LLM Client | `common/llm_client.py` | DeepSeek / Ollama dual-backend hot-switching, persists to `.env` |
-| Embedding | `common/embedding_client.py` | Ollama local embedding model (qwen3-embedding:8b) |
+| App Context | `common/context.py` | Global service context, manages LLM / Embedding / Reranker / BM25 / ChromaDB / MCP instances |
+| LLM Client | `common/llm_client.py` | Inference tier: DeepSeek / Ollama dual-backend hot-switching |
+| Embedding | `common/embedding_client.py` | Vectorization tier: Ollama local embedding model |
+| Reranker | `common/reranker.py` | Reranking tier: sentence-transformers Cross-Encoder, toggleable |
+| BM25 Store | `common/bm25_store.py` | Sparse retrieval: Okapi BM25 algorithm |
 | Vector Store | `common/vector_store.py` | ChromaDB operations (attractions + documents dual collections) |
 | Document Loader | `common/document_loader.py` | PDF/DOCX/TXT/MD parsing and chunking |
 | MCP Server | `common/mcp_server/server.py` | FastMCP server, registers 5 async tools |
-| MCP Client | `common/mcp_server/client.py` | Dual-path calls (MCP protocol first, circuit-breaker fallback to tools.py) |
-| MCP Tools | `common/mcp_server/tools.py` | Flight/train/hotel/weather/attraction search (reads mock JSON data) |
-
-> Same foundation, different Agent roles and orchestration logic — transforming from a "knowledge assistant" into a "travel planner." This is the power of MCP + LangGraph architecture.
+| MCP Client | `common/mcp_server/client.py` | Dual-path calls (MCP protocol first, circuit-breaker fallback) |
+| MCP Tools | `common/mcp_server/tools.py` | Flight/train/hotel/weather/attraction search |
 
 **MCP Tools Overview:**
 
@@ -177,6 +135,8 @@ Both projects share the `common/` module:
 | `get_weather` | city, days | `{daily: [...], clothing_advice}` | 6 city configs, dynamically generated |
 | `search_attractions` | city, preferences | `[{name, category, ticket_price, ...}]` | 6 cities × 12 attractions mock data |
 
+> `get_weather` and `search_attractions` support real APIs: set `WEATHER_API_KEY` (QWeather) and `AMAP_API_KEY` (Amap) in `.env`.
+
 ---
 
 ## Option B Architecture
@@ -187,12 +147,12 @@ React + shadcn/ui (Frontend, port 3000)
     │  4 pages: Home / KnowSeeker / TripMind / Settings
     ↕ REST API / SSE streaming
 FastAPI (Backend, port 8000)
-    │  12 API endpoints
-    ├── knowseeker/agent.py        # RAG Q&A
-    ├── knowseeker/rag_chain.py    # Document management
+    │  13 API endpoints
+    ├── knowseeker/agent.py        # RAG Q&A (async task)
+    ├── knowseeker/rag_chain.py    # Document management + hybrid retrieval
     ├── tripmind/orchestrator.py   # Travel planning + SSE streaming
-    └── common/llm_client.py       # LLM settings management
-                                   
+    └── common/context.py          # Three-tier config management
+
 MCP Server (port 8765, FastAPI lifecycle auto-managed)
     └── common/mcp_server/tools.py → mock_data/*.json
 ```
@@ -203,7 +163,8 @@ MCP Server (port 8765, FastAPI lifecycle auto-managed)
 
 | Method | Path | Function |
 | --- | --- | --- |
-| `POST` | `/api/chat` | KnowSeeker RAG Q&A |
+| `POST` | `/api/chat` | Create RAG Q&A async task, returns `taskId` |
+| `GET` | `/api/chat/{task_id}` | Poll task status and results |
 | `POST` | `/api/documents/upload` | Upload document to knowledge base |
 | `GET` | `/api/documents` | List indexed documents |
 | `DELETE` | `/api/documents/{doc_id}` | Delete a document |
@@ -211,78 +172,9 @@ MCP Server (port 8765, FastAPI lifecycle auto-managed)
 | `POST` | `/api/travel/plan/stream` | SSE streaming travel planning |
 | `POST` | `/api/travel/adjust` | Follow-up adjustment to travel plan |
 | `GET` | `/api/models` | Get available model list |
-| `GET` | `/api/settings` | Get current LLM configuration |
-| `POST` | `/api/settings` | Update LLM configuration (persisted to .env) |
+| `GET` | `/api/settings` | Get three-tier config (inference + vectorization + reranking) |
+| `POST` | `/api/settings` | Update three-tier config (persisted to .env) |
 | `GET` | `/api/health` | Health check |
-
----
-
-## Project Structure
-
-```
-ai-coursework-lab/
-├── common/                        # Shared modules
-│   ├── llm_client.py              # LLM client (DeepSeek/Ollama hot-switch)
-│   ├── embedding_client.py        # Ollama local embedding model
-│   ├── vector_store.py            # ChromaDB vector store (dual collections)
-│   ├── document_loader.py         # Multi-format document parsing & chunking
-│   └── mcp_server/                # MCP protocol layer
-│       ├── server.py              # FastMCP server (5 tools)
-│       ├── tools.py               # Tool function implementations
-│       ├── client.py              # MCP client (dual-path + circuit breaker)
-│       ├── init_attractions.py    # Attractions data → ChromaDB initialization
-│       ├── smart_plan.py          # Third-party real data (Fliggy+Amap)
-│       └── mock_data/             # Mock data
-│           ├── flights.json       # 11 routes
-│           ├── trains.json        # 11 routes
-│           ├── hotels.json        # 6 cities × 5 hotels
-│           ├── weather.json       # 6 city weather configs
-│           └── attractions/       # 6 cities × 12 attractions
-├── knowseeker/                    # Project 1: Knowledge Assistant
-│   ├── app.py                     # Streamlit entry (Option A)
-│   ├── agent.py                   # LangGraph Agentic RAG state machine
-│   ├── rag_chain.py               # RAG pipeline (load→chunk→vectorize→retrieve)
-│   └── README.md
-├── tripmind/                      # Project 2: Travel Planner
-│   ├── app.py                     # Gradio entry (Option A)
-│   ├── orchestrator.py            # LangGraph orchestrator (DAG + streaming)
-│   ├── prompts.py                 # 6 Agent system prompts
-│   ├── types.py                   # TravelRequest / TravelState types
-│   ├── agents/                    # 6 domain Agents
-│   │   ├── base.py                # BaseAgent (LLM + MCP + fault tolerance)
-│   │   ├── weather.py             # 🌤️ Weather Agent
-│   │   ├── transport.py           # ✈️ Transport Agent
-│   │   ├── hotel.py               # 🏨 Hotel Agent
-│   │   ├── itinerary.py           # 🗺️ Itinerary Agent
-│   │   ├── budget.py              # 💰 Budget Agent
-│   │   └── summarizer.py          # 📝 Summarizer Agent
-│   └── README.md
-├── backend/                       # FastAPI backend (Option B)
-│   └── server.py                  # 12 REST API endpoints + MCP lifecycle management
-├── frontend/                      # React frontend (Option B)
-│   ├── app/                       # Next.js 14 App Router
-│   │   ├── page.tsx               # Home (project navigation)
-│   │   ├── knowseeker/page.tsx    # Knowledge Q&A interface
-│   │   ├── tripmind/page.tsx      # Travel planning interface (SSE streaming)
-│   │   ├── settings/page.tsx      # LLM configuration interface
-│   │   └── layout.tsx             # Global layout + sidebar
-│   ├── components/ui/             # shadcn/ui component library
-│   └── package.json
-├── design/                        # Design documents
-│   ├── 01-tech-stack.md           # Tech stack selection
-│   ├── 02-knowseeker.md           # KnowSeeker requirements & design
-│   ├── 03-tripmind.md             # TripMind requirements & design
-│   ├── 04-tripmind-implementation.md  # TripMind implementation plan
-│   └── 05-tripmind-progress.md    # TripMind progress report
-├── data/
-│   └── chromadb/                  # ChromaDB persistent data
-├── .env.example                   # Environment variable template
-├── Makefile                       # Quick launch commands
-├── pyproject.toml                 # uv project config
-├── CLAUDE.md                      # AI development assistant instructions
-├── codemap.md                     # Repository code map
-└── README.md                      # This file
-```
 
 ---
 
@@ -290,23 +182,19 @@ ai-coursework-lab/
 
 | Pattern | Description |
 | --- | --- |
-| **MCP Protocol Abstraction** | All tool calls go through `client.call_tool()` → MCP Streamable HTTP first, permanent fallback to `tools.py` after 3 consecutive failures |
-| **LLM Hot-switching** | `LLMClient.update()` switches between DeepSeek and Ollama at runtime, persists to `.env` |
-| **Safe Execution** | Each Agent's `execute()` is wrapped by `safe_execute()`, single Agent failure doesn't block the pipeline |
+| **App Context** | `common/context.py` centralizes all service instances, accessed via `get_context()` |
+| **Three-tier Config** | Inference (LLM), Vectorization (Embedding), Reranking tiers independently configurable and hot-swappable |
+| **Hybrid Retrieval + RRF** | BM25 sparse + ChromaDB dense retrieval in parallel, fused via Reciprocal Rank Fusion |
+| **Cross-Encoder Reranking** | Fused candidates refined by sentence-transformers Cross-Encoder |
+| **MCP Protocol Abstraction** | MCP Streamable HTTP first, permanent fallback to `tools.py` after 3 consecutive failures |
+| **LLM Hot-switching** | Runtime switching between DeepSeek and Ollama, persisted to `.env` |
+| **Safe Execution** | Each Agent's `execute()` wrapped by `safe_execute()`, single failure doesn't block pipeline |
 | **Parallel + Sequential** | Independent Agents run via `asyncio.gather`, dependent Agents execute sequentially |
 | **Agentic Decision Loop** | KnowSeeker's LangGraph state machine autonomously decides multi-round retrieval |
-| **Follow-up Adjustment** | TripMind's `adjust_plan()` identifies affected Agents via keyword matching, only re-runs relevant parts |
-| **SSE Streaming** | Option B backend pushes progress per-node via `graph.astream()`, frontend updates Agent status panel in real-time |
-| **Dual-path LLM** | Each Agent falls back to built-in data-driven logic when LLM calls fail, ensuring availability |
-
----
-
-## Who Is This For
-
-- Students working on LLM/Agent course projects
-- Developers wanting LangGraph + MCP hands-on experience
-- Engineers needing Multi-Agent architecture reference
-- Full-stack developers learning decoupled AI application architecture
+| **Follow-up Adjustment** | TripMind's `adjust_plan()` identifies affected Agents via keyword matching |
+| **SSE Streaming** | Backend pushes progress per-node via `graph.astream()` |
+| **Dual-path LLM** | Each Agent falls back to built-in data-driven logic when LLM calls fail |
+| **Async RAG Task** | `/api/chat` returns `taskId`, frontend polls `/api/chat/{task_id}` for results |
 
 ---
 
