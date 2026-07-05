@@ -609,9 +609,9 @@ async def search_flights(
                             "price": int(m.group(7)),
                         }
                     )
-                if flights:
-                    _log_source("search_flights", "飞猪(smart-plan)")
-                    return flights
+            if flights:
+                _log_source("search_flights", "飞猪(smart-plan)")
+                return flights
 
     # 2. 仅在 USE_MOCK 时回退到模拟数据
     if not USE_MOCK:

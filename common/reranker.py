@@ -85,7 +85,7 @@ class RerankerClient:
             重排后的文档列表（按相关性降序），每项新增 rerank_score 字段。
         """
         if not self.enabled:
-            return documents[:top_k]
+            return documents
 
         if not documents:
             return []

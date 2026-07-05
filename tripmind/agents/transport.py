@@ -57,7 +57,7 @@ class TransportAgent(BaseAgent):
                 "options": all_options,
                 "recommended": recommended,
                 "total_cost_round": total_round,
-                "advice": f"推荐{recommended.get('type', '')}：{recommended.get('name', '')}，{recommended.get('price', 0)}元",
+                "advice": f"推荐{recommended.get('type', '')}：{recommended.get('flight_no', '') or recommended.get('train_no', '')}，{recommended.get('price', 0)}元",
                 "llm_analysis": llm_result,
             }
         except Exception:
@@ -68,11 +68,11 @@ class TransportAgent(BaseAgent):
                 "options": all_options,
                 "recommended": recommended,
                 "total_cost_round": total_round,
-                "advice": f"推荐{recommended.get('type', '')}：{recommended.get('name', '')}，{recommended.get('price', 0)}元",
+                "advice": f"推荐{recommended.get('type', '')}：{recommended.get('flight_no', '') or recommended.get('train_no', '')}，{recommended.get('price', 0)}元",
             }
 
         state["transport_result"] = result
-        self.add_log(state, f"找到 {len(all_options)} 个交通方案，推荐 {recommended.get('name', '')}")
+        self.add_log(state, f"找到 {len(all_options)} 个交通方案，推荐 {recommended.get('flight_no', '') or recommended.get('train_no', '')}")
         return state
 
 

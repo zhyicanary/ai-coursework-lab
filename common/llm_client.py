@@ -59,13 +59,13 @@ class LLMClient:
                 "OLLAMA_BASE_URL", "http://localhost:11434/v1"
             )
             self.api_key = "ollama"
-            self.model = self.model or os.getenv("OLLAMA_MODEL", "gemma4:latest")
+            self.model = self.model or os.getenv("OLLAMA_MODEL", "gemma3:latest")
         else:
             self.base_url = self.base_url or os.getenv(
                 "DEEPSEEK_BASE_URL", "https://api.deepseek.com"
             )
             self.api_key = self.api_key or os.getenv("DEEPSEEK_API_KEY", "")
-            self.model = self.model or os.getenv("DEEPSEEK_MODEL", "deepseek-v4-flash")
+            self.model = self.model or os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
 
         if not self.api_key:
             self.api_key = "sk-placeholder"
@@ -143,8 +143,8 @@ class LLMClient:
         官方模型列表参考：https://api-docs.deepseek.com/zh-cn/api/list-models
         """
         if (backend or self.backend) == "ollama":
-            return ["gemma4:latest"]
-        return ["deepseek-v4-flash", "deepseek-v4-pro"]
+            return ["gemma3:latest"]
+        return ["deepseek-chat", "deepseek-reasoner"]
 
     async def chat_completion(
         self,
@@ -183,9 +183,6 @@ class LLMClient:
         msg = response.choices[0].message
         content = msg.content or ""
         reasoning = getattr(msg, "reasoning_content", None) or ""
-
-        # 调试：看模型实际返回了什么
-        print(f"[LLM] content='{content[:200]}' reasoning_content='{reasoning[:200]}'")
 
         if content:
             # 模型把回答放在 content，思考放在 reasoning_content

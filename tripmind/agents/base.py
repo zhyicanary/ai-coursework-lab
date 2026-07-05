@@ -130,5 +130,6 @@ class BaseAgent(ABC):
             "住宿": "hotel",
             "行程": "itinerary",
             "预算": "budget",
+            "汇总": "summary",
         }
         return name_map.get(self.name, self.name.lower())

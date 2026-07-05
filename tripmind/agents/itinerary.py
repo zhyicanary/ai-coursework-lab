@@ -32,7 +32,7 @@ class ItineraryAgent(BaseAgent):
             transport_info = ""
             if transport and "recommended" in transport:
                 t = transport["recommended"]
-                transport_info = f"{t.get('type', '')} {t.get('name', '')} 到达{t.get('arrival_time', '')}"
+                transport_info = f"{t.get('type', '')} {t.get('flight_no', '') or t.get('train_no', '')} 到达{t.get('arrival_time', '')}"
 
             user_msg = (
                 f"目的地：{request['destination']}\n"

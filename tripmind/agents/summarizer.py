@@ -54,7 +54,7 @@ class SummarizerAgent(BaseAgent):
 
         lines.append("## 交通数据")
         rec = transport.get("recommended", {})
-        lines.append(f"推荐：{rec.get('name', '暂无数据')} {rec.get('type', '')} {rec.get('price', 0)}元")
+        lines.append(f"推荐：{rec.get('flight_no', '') or rec.get('train_no', '') or '暂无数据'} {rec.get('type', '')} {rec.get('price', 0)}元")
         lines.append(f"往返总计：{transport.get('total_cost_round', 0)}元")
         lines.append("")
 
