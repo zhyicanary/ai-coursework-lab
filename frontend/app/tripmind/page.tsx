@@ -30,6 +30,7 @@ import {
   Wand2,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
+import { API_BASE_API } from "@/lib/config"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -275,7 +276,7 @@ export default function TripMindPage() {
     )
 
     try {
-      const res = await fetch("http://localhost:8000/api/travel/plan/stream", {
+      const res = await fetch(`${API_BASE_API}/travel/plan/stream`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -360,7 +361,7 @@ export default function TripMindPage() {
 
     setAdjustLoading(true)
     try {
-      const res = await fetch("http://localhost:8000/api/travel/adjust", {
+      const res = await fetch(`${API_BASE_API}/travel/adjust`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ state: lastState, message: adjustInput }),

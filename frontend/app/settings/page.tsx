@@ -38,8 +38,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-
-const API_BASE = "http://localhost:8000";
+import { API_BASE } from "@/lib/config";
 
 interface FullSettings {
     // 推理层

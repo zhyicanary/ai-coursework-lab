@@ -24,7 +24,7 @@ interface KnowSeekerContextType {
   progress: number; // 0..1
   error: string | null;
   sendMessage: (question: string) => Promise<string>; // 返回 taskId
-  restoreTask: (taskId: string) => Promise<void>; // 轮询已有任务
+  restoreTask: (taskId: string) => Promise<boolean>; // 轮询已有任务
   appendAssistantMessage: (msg: ChatMessage) => void; // 轮询结果写入
   setError: (err: string | null) => void;
   setLoading: (v: boolean) => void;
@@ -32,7 +32,7 @@ interface KnowSeekerContextType {
   clearChat: () => void;
 }
 
-const API_BASE = "http://localhost:8000/api";
+import { API_BASE_API as API_BASE } from "@/lib/config";
 
 // ── Context ───────────────────────────────────────────────
 
@@ -106,8 +106,6 @@ export function KnowSeekerProvider({
           return false;
         }
         const task = await res.json();
-        console.log("[restoreTask] GET response:", task);
-
         if (task.status === "completed") {
           setMessages((prev) => {
             // 如果用户消息丢了（刷新后），从后端返回的 question 重建
