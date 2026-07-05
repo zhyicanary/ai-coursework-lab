@@ -22,7 +22,7 @@ frontend/.next/
 frontend/next-env.d.ts
 frontend/*.tsbuildinfo
 frontend/.pnpm-store/
-pnpm-lock.yaml
+/pnpm-lock.yaml
 
 # ── macOS ──────────────────────────────────────────
 .DS_Store
