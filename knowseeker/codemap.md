@@ -2,7 +2,9 @@
 
 ## 职责
 
-KnowSeeker 是一个单智能体的 **Agentic RAG**（检索增强生成）知识助手。用户上传文档（PDF/DOCX/TXT/MD），然后提出自然语言问题。与传统的一次性检索不同，LangGraph 状态机自主判断一次检索是否足够，还是需要重新构造查询并再次搜索——以此展示智能体的决策能力。所有推理步骤、检索日志和来源引用均在 Streamlit 前端中可视化展示。
+KnowSeeker 是一个单智能体的 **Agentic RAG**（检索增强生成）知识助手。用户上传文档（PDF/DOCX/TXT/MD），然后提出自然语言问题。与传统的一次性检索不同，LangGraph 状态机自主判断一次检索是否足够，还是需要重新构造查询并再次搜索——以此展示智能体的决策能力。所有推理步骤、检索日志和来源引用均通过 FastAPI + React 前端可视化展示。
+
+> ⚠️ 本文件部分内容描述的是旧方案 A（Streamlit 前端），该方案已移除。KnowSeeker 当前通过 FastAPI（`backend/server.py`）提供 API、React（`frontend/app/knowseeker/`）作为前端。核心模块（`agent.py`、`rag_chain.py`）已实现且完整可用。
 
 ## 文件
 
@@ -13,23 +15,6 @@ KnowSeeker 是一个单智能体的 **Agentic RAG**（检索增强生成）知�
 - `README_EN.md` — `README.md` 的英文翻译。结构与内容相同。
 
 - `codemap.md` — 本文档。面向开发者的架构图。
-
-### 待实现文件（根据设计文档）
-
-以下文件在 `design/02-knowseeker.md` 中有说明，但尚未存在于本目录中。这里列出作为路线图：
-
-- `app.py` — **Streamlit 前端入口点**。三个 UI 区域：侧边栏用于文档上传（文件上传组件），主聊天面板（使用 `st.chat_message` 展示用户/助手对话轮次），以及一个可展开的思维链区域展示每个推理步骤。通过 `streamlit run knowseeker/app.py` 运行。
-
-- `agent.py` — **LangGraph 状态机**，实现 Agentic RAG 循环。定义了一个 `AgentState` TypedDict，包含以下字段：`question`、`search_plan`、`search_history`、`need_more_search`、`final_context`、`answer`、`citations`、`thinking_trace`。包含五个图节点：
-  - `analyze_question(state)` — LLM 分析问题并生成搜索计划（关键词、策略、轮次数）。
-  - `retrieve(state)` — 调用 MCP 工具 `search_knowledge_base` 执行向量搜索，返回 Top-K 文本块。
-  - `evaluate_results(state)` — LLM 判断检索到的文本块是否足以回答问题；设置 `need_more_search`。
-  - `reformulate(state)` — LLM 使用不同关键词重写搜索查询，进行第二次尝试。
-  - `generate_answer(state)` — LLM 根据 `final_context` 综合生成最终答案并附带内联引用。
-
-  边：`analyze → retrieve → evaluate → (sufficient ? generate : reformulate → retrieve)`。
-
-- `rag_chain.py` — **基础 RAG 管道**工具。封装 LangChain 的文档加载（`PyPDF2`、`python-docx`、`unstructured`、`markdown`）、文本分块（`chunk_size=500`、`overlap=50`）、使用 `BAAI/bge-small-zh-v1.5` 进行嵌入、ChromaDB 导入以及相似度搜索。将纯检索管道与智能体决策层分离。
 
 ## 设计模式
 
@@ -46,7 +31,10 @@ KnowSeeker 是一个单智能体的 **Agentic RAG**（检索增强生成）知�
 ### 文档摄入流程
 
 ```
-用户在 Streamlit 侧边栏上传文件
+用户通过 React 前端上传文件
+    │
+    ▼
+backend/server.py /api/documents/upload → knowseeker/rag_chain.py.index_document()
     │
     ▼
 common/document_loader.py.load(file)
@@ -55,19 +43,22 @@ common/document_loader.py.load(file)
     └── 分块为文本片段 (500 字符, 50 字符重叠)
     │
     ▼
-common/embedding_client.py  (BAAI/bge-small-zh-v1.5 → 512 维向量)
+common/vector_store.py.add_documents() → ChromaDB (qwen3-embedding:8b 向量)
     │
     ▼
-common/vector_store.py.add_to_chromadb(chunks, embeddings, metadata)
+common/context.get_context().bm25_store.add_texts() → 同步 BM25 索引
     │
     ▼
-Streamlit 显示: "已入库 N 个文档片段"
+React 显示: "已入库 N 个文档片段"
 ```
 
 ### 问答流程 (Agentic RAG)
 
 ```
-用户在 Streamlit 聊天输入框中输入问题
+用户在 React 前端聊天输入框中输入问题
+    │
+    ▼
+backend/server.py → knowseeker/agent.py agentic_rag_stream()
     │
     ▼
 [analyze_question]  LLM 分析问题复杂度
@@ -75,8 +66,10 @@ Streamlit 显示: "已入库 N 个文档片段"
     └── 记录到 thinking_trace
     │
     ▼
-[retrieve]  调用 MCP 工具: search_knowledge_base(query=keywords, top_k=5)
-    ├── MCP 服务器 → vector_store.similarity_search() → ChromaDB
+[retrieve]  本地调用: search_with_rerank(query, top_k=5, recall_k=20)
+    ├── 稠密检索: vector_store.search_documents() → ChromaDB
+    ├── 稀疏检索: bm25_store.search() → BM25 索引
+    ├── RRF 融合 → Cross-Encoder 重排序
     └── 返回 Top-5 文本块 → 存入 search_history, 记录到 thinking_trace
     │
     ▼
@@ -96,9 +89,9 @@ Streamlit 显示: "已入库 N 个文档片段"
     └── 记录到 thinking_trace
     │
     ▼
-Streamlit 渲染:
-    ├── 💬 助手回答（附可展开的引用）
-    └── 🧠 思维链面板（分析 → 每轮检索 → 评估 → 最终结果）
+React (SSE 流式接收):
+    ├── 助手回答（附可展开的引用和来源）
+    └── 思维链面板（分析 → 每轮检索 → 评估 → 最终结果）
 ```
 
 ## 集成点
@@ -106,10 +99,10 @@ Streamlit 渲染:
 | 集成模块 | 方向 | 详情 |
 |------------|-----------|-------|
 | **common/llm_client.py** | 依赖 | DeepSeek API（兼容 OpenAI 接口）。每个智能体节点在分析、评估、重新构造和生成时都会使用。默认 5 秒超时并带降级回退。 |
-| **common/embedding_client.py** | 依赖 | 通过 sentence-transformers 使用 `BAAI/bge-small-zh-v1.5`。在文档摄入期间使用。512 维向量。 |
-| **common/vector_store.py** | 依赖 | ChromaDB 封装。提供 `add_to_chromadb()`、`similarity_search()`、`list_documents()`、`delete_document()`。通过 MCP 工具间接调用。 |
-| **common/document_loader.py** | 依赖（预期） | 解析 PDF/DOCX/TXT/MD 文件。以 500 字符粒度、50 字符重叠生成文本块。 |
-| **common/mcp_server/server.py** | 依赖 | FastMCP 服务器，注册三个工具：`search_knowledge_base(query, top_k, filter_doc)`、`list_documents()`、`delete_document(doc_name)`。作为子进程或边车（sidecar）启动。 |
-| **common/mcp_server/client.py** | 依赖 | MCP 客户端封装。智能体调用 `call_tool("search_knowledge_base", args)`，该调用通过 MCP 协议路由，在服务器不可用时降级为直接调用 `tools.py`。 |
-| **Streamlit (前端)** | 面向用户 | `streamlit run knowseeker/app.py`。单页应用，包含侧边栏（文档上传 + 文档列表）和主区域（聊天面板 + 思维链跟踪 + 带引用的答案）。 |
+| **common/embedding_client.py** | 依赖 | 通过 Ollama 使用 `qwen3-embedding:8b` 进行文本向量化。 |
+| **common/vector_store.py** | 依赖 | ChromaDB 封装。提供 `add_documents()`、`search_documents()`、`list_documents()`、`delete_document()`。直接调用（非 MCP）。 |
+| **common/bm25_store.py** | 依赖 | BM25 稀疏检索，与稠密检索互补（RRF 融合）。通过 `context.get_context().bm25_store` 获取。 |
+| **common/reranker.py** | 依赖 | Cross-Encoder 重排序器，对 RRF 融合结果二次排序。通过 `context.get_context().reranker` 获取。 |
+| **common/document_loader.py** | 依赖 | 解析 PDF/DOCX/TXT/MD 文件。以 500 字符粒度、50 字符重叠生成文本块。 |
+| **React (前端)** | 面向用户 | `frontend/app/knowseeker/page.tsx`。基于 Next.js 14 + shadcn/ui 的聊天界面，包含文档上传、思维链追踪、引用展示。通过 `backend/server.py` 的 FastAPI 接口与后端通信。 |
 | **design/02-knowseeker.md** | 被文档说明 | 完整的需求、架构图、LangGraph 状态图、数据结构（`AgentState` TypedDict）以及 UI 线框图。 |

@@ -2,15 +2,9 @@
 
 ## 职责
 
-TripMind 是一个基于 **LangGraph** 状态机编排的多智能体旅行规划系统。它是 `ai-coursework-lab` 系列中的第二个课程项目，展示了**多智能体编排范式**：用户的旅行请求被分解为并行的和顺序的子任务，每个子任务由专门的智能体（天气、交通、酒店、行程、预算、汇总器）处理。该系统与同一技术基础下的兄弟项目 `knowseeker/`（单智能体 RAG）共享 `common/` 模块（LLM 客户端、MCP 服务器、向量存储）。前端采用 Next.js 14 + React 18 + shadcn/ui（方案B），后端通过 FastAPI + SSE 流式推送进度；同时保留 Gradio 全栈方案（方案A，`app.py`）作为备选。
+TripMind 是一个基于 **LangGraph** 状态机编排的多智能体旅行规划系统。它是 `ai-coursework-lab` 系列中的第二个课程项目，展示了**多智能体编排范式**：用户的旅行请求被分解为并行的和顺序的子任务，每个子任务由专门的智能体（天气、交通、酒店、行程、预算、汇总器）处理。该系统与同一技术基础下的兄弟项目 `knowseeker/`（单智能体 RAG）共享 `common/` 模块（LLM 客户端、MCP 服务器、向量存储）。前端采用 Next.js 14 + React 18 + shadcn/ui，后端通过 FastAPI + SSE 流式推送进度。
 
 ## 文件
-
-- **`app.py`** — Gradio 前端入口点（方案A，770 行）。定义了一个包含 3 个标签页的 `gr.Blocks` UI：
-  - **旅行规划 (Travel Planning)**：输入表单（目的地、天数、预算、出发地、偏好），`plan_btn` 触发 `plan_travel()`，后者通过 `run_travel_planner_stream()` 流式传输结果。展示智能体执行状态（`_format_agent_status()`）、通信日志、最终 Markdown 方案以及下载按钮。包含用于 UC-05 追问调整的**调整手风琴**（`handle_adjustment()`）。
-  - **对话 (Chat)**：通过 `chat()` 使用 `llm.chat_completion()` 实现的简易聊天机器人，以 `list[dict]` 形式维护消息历史。
-  - **设置 (Settings)**：LLM 后端配置（`deepseek`/`ollama`），包含 `update_settings()`、用于即时下拉切换的 `on_backend_change()`、用于异步获取模型列表的 `refresh_model_list()`，以及用于页面加载回显的 `get_config()`。
-  - **MCP 生命周期**：`start_mcp_server()` 将 `common.mcp_server.server` 作为子进程启动；`stop_mcp_server()` 在关闭时终止该进程。在 Gradio 重载线程期间跳过 MCP。
 
 - **`orchestrator.py`** — LangGraph 状态机编排器（454 行）。通过 `build_travel_graph()` 构建包含 5 个节点的 `StateGraph(TravelState)`：
   - `orchestrator_node` — 初始化，记录调度开始日志。
@@ -39,7 +33,7 @@ TripMind 是一个基于 **LangGraph** 状态机编排的多智能体旅行规�
 - **双路径智能体执行**：每个智能体继承 `BaseAgent`（位于 `agents/base.py`），通过 `call_mcp()`（优先使用 MCP 协议，回退到直接调用 `tools.py`）和 `call_llm()`（5 秒超时，回退到内置逻辑）执行。`safe_execute()` 包装 `execute()` 以隔离故障。
 - **分派时复制**：每个子智能体接收 `_copy_state(state)`，该函数将 `agent_logs` 重置为 `[]`，防止合并结果时日志重复。
 - **定向重新执行 (UC-05)**：`adjust_plan()` 使用 `_parse_adjustment()` 的关键词匹配和 `_AGENT_DEPENDENCIES` 计算最小重新执行集合，保留 `previous_state` 中未受影响的结果。
-- **流式进度**：`run_travel_planner_stream()` 通过 `graph.astream()` 逐节点产出 `TravelState` 快照；`_NODE_PROGRESS` 将节点名称映射为 `(百分比, 标签)` 元组，用于 Gradio 进度条。
+   - **流式进度**：`run_travel_planner_stream()` 通过 `graph.astream()` 逐节点产出 `TravelState` 快照；进度信息通过 SSE 推送到 React 前端。
 
 ## 数据流与控制流
 
@@ -80,7 +74,7 @@ run_travel_planner_stream(request, progress)
 React UI: final_plan (rendered Markdown via react-markdown) + agent_status + download/copy buttons
 ```
 
-流中的每次 `yield` 都通过 SSE 实时推送到 React 前端（Agent 状态面板、Markdown 方案）。Gradio 方案A中每次 yield 更新 Gradio UI。
+流中的每次 `yield` 都通过 SSE 实时推送到 React 前端（Agent 状态面板、Markdown 方案）。
 
 ## 集成点
 
@@ -94,4 +88,4 @@ React UI: final_plan (rendered Markdown via react-markdown) + agent_status + dow
   - `agents/base.py` — `BaseAgent` 类，包含 `call_mcp()`、`call_llm()`、`safe_execute()`、`add_log()`。
   - `agents/weather.py`、`agents/transport.py`、`agents/hotel.py`、`agents/itinerary.py`、`agents/budget.py`、`agents/summarizer.py` — 具体的智能体实例，以单例形式（`weather_agent`、`transport_agent` 等）在 `orchestrator.py` 中导入。
 
-- **被消费方**：React 前端（Next.js，`frontend/app/tripmind/page.tsx`，735 行）通过 SSE 调用 `run_travel_planner_stream`；Gradio 前端（`app.launch()` 监听 `0.0.0.0:7861`）为旧方案A。最终的 `final_plan`（Markdown）直接渲染在 UI 中，并可作为 `.md` / `.txt` 文件下载或复制。
+- **被消费方**：React 前端（Next.js，`frontend/app/tripmind/page.tsx`）通过 SSE 调用 `run_travel_planner_stream`。最终的 `final_plan`（Markdown）直接渲染在 UI 中，并可作为 `.md` / `.txt` 文件下载或复制。

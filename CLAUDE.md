@@ -2,15 +2,12 @@
 
 同一技术底座，两种 Agent 范式：
 
-| # | 项目 | 范式 | 前端（方案A） | 前端（方案B） | 入口 |
-|---|------|------|------|------|------|
-| 1 | KnowSeeker | 单 Agent 深度推理 (Agentic RAG) | Streamlit | React + shadcn/ui | `knowseeker/app.py` / `frontend/app/knowseeker/` |
-| 2 | TripMind | 多 Agent 协同编排 (Multi-Agent) | Gradio | React + shadcn/ui + SSE | `tripmind/app.py` / `frontend/app/tripmind/` |
+| # | 项目 | 范式 | 前端 | 入口 |
+|---|------|------|------|------|
+| 1 | KnowSeeker | 单 Agent 深度推理 (Agentic RAG) | React + shadcn/ui | `frontend/app/knowseeker/` |
+| 2 | TripMind | 多 Agent 协同编排 (Multi-Agent) | React + shadcn/ui + SSE | `frontend/app/tripmind/` |
 
-两个项目共享 `common/` 模块（LLM API、向量库、MCP Server）。
-
-> **方案B**（当前主推）：FastAPI 后端 API + Next.js 14 + React 18 + shadcn/ui + Tailwind CSS，前后端分离，SSE 流式推送。
-> **方案A**（保留可用）：Streamlit / Gradio 全栈 Python，直接调用 `common/` 层逻辑。
+两个项目共享 `common/` 模块（LLM API、向量库、MCP Server）。后端统一使用 FastAPI + SSE 流式推送，前端使用 Next.js 14 + React 18 + shadcn/ui + Tailwind CSS，前后端分离。
 
 ---
 
@@ -24,7 +21,7 @@
 - **协议**: MCP (Python MCP SDK, FastMCP)
 - **后端（方案B）**: FastAPI + SSE 流式 + MCP 生命周期自动管理
 - **前端（方案B）**: Next.js 14 + React 18 + shadcn/ui + Tailwind CSS
-- **前端（方案A）**: Streamlit + Gradio
+
 
 ---
 
@@ -55,9 +52,9 @@ ai-coursework-lab/
 │               ├── xian.json
 │               ├── guangzhou.json
 │               └── hangzhou.json
-├── backend/                         # FastAPI 后端（方案B）
+├── backend/                         # FastAPI 后端
 │   └── server.py                    # 12 个 REST API 端点 + MCP 生命周期管理
-├── frontend/                        # React 前端（方案B）
+├── frontend/                        # React 前端
 │   ├── app/                         # Next.js 14 App Router
 │   │   ├── page.tsx                 # 首页（项目导航）
 │   │   ├── knowseeker/page.tsx      # 知识问答界面
@@ -69,7 +66,6 @@ ai-coursework-lab/
 │   │   └── app-sidebar.tsx          # 应用侧边栏
 │   └── package.json
 ├── tripmind/                        # 课设二：多 Agent 旅游规划
-│   ├── app.py                       # Gradio 前端（方案A）
 │   ├── orchestrator.py              # LangGraph 状态机编排器
 │   ├── prompts.py                   # 6 个 Agent 系统提示词（含 JSON 输出格式）
 │   ├── types.py                     # TravelRequest / TravelState 类型定义
@@ -82,7 +78,6 @@ ai-coursework-lab/
 │       ├── budget.py                # BudgetAgent：费用汇总预算检查
 │       └── summarizer.py            # SummarizerAgent：Markdown 方案生成
 ├── knowseeker/                      # 课设一：单 Agent RAG 问答
-│   ├── app.py                       # Streamlit 前端（方案A）
 │   ├── agent.py                     # LangGraph Agentic RAG 状态机
 │   └── rag_chain.py                 # RAG 管道（加载→分块→向量化→检索）
 ├── design/                          # 设计文档
@@ -188,34 +183,21 @@ analyze_question → retrieve → evaluate_results
 
 ## 运行
 
-### 方案A — 全栈 Python
-
 ```bash
-# 课设一 - KnowSeeker（Streamlit）
-uv run streamlit run knowseeker/app.py
+# 后端 API（自动管理 MCP Server 子进程）
+uv run uvicorn backend.server:app --host 0.0.0.0 --port 8000
 
-# 课设二 - TripMind（Gradio）
-uv run python tripmind/app.py
-# 启动后自动访问 http://localhost:7861
-
-# 单独启动 MCP Server
+# 单独启动 MCP Server（可选，后端会自动启动）
 uv run python -m common.mcp_server.server
 
 # 初始化景点数据到 ChromaDB（可选，需要 Ollama 运行中）
 ollama serve
 uv run python -m common.mcp_server.init_attractions
-```
 
-### 方案B — 前后端分离
-
-```bash
-# 后端 API（自动管理 MCP Server 子进程）
-uv run uvicorn backend.server:app --host 0.0.0.0 --port 8000
-
-# 前端
+# 前端（Next.js 14 + shadcn/ui）
 cd frontend
-npm install or pnpm install  # 首次安装依赖
-npm run dev or pnpm dev  # 访问 http://localhost:3000
+pnpm install  # 首次安装依赖
+pnpm dev  # 访问 http://localhost:3000
 ```
 
 ---
@@ -235,7 +217,7 @@ npm run dev or pnpm dev  # 访问 http://localhost:3000
 
 ---
 
-## API 端点（方案B）
+## API 端点
 
 | 方法 | 路径 | 功能 |
 |------|------|------|
@@ -266,4 +248,4 @@ npm run dev or pnpm dev  # 访问 http://localhost:3000
 - **模拟数据**：添加新数据到 `common/mcp_server/mock_data/`
 - **MCP 客户端**：`common/mcp_server/client.py` 的 `call_tool()` 是统一入口
 - **LLM 调用**：失败时自动走回退逻辑，确保功能可用
-- **前端开发**：组件使用 shadcn/ui，页面放在 `frontend/app/` 下，API 请求统一指向 `http://localhost:8000`
+- **前端开发**：组件使用 shadcn/ui，页面放在 `frontend/app/` 下。API 基础 URL 统一在 `frontend/lib/config.ts` 中配置（`API_BASE` / `API_BASE_API`）
