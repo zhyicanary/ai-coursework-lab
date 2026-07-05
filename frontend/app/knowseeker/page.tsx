@@ -51,8 +51,7 @@ import {
 import { toast } from "sonner";
 import { useKnowSeeker } from "@/lib/knowseeker-context";
 import type { ChatMessage } from "@/lib/knowseeker-context";
-
-const API_BASE = "http://localhost:8000/api";
+import { API_BASE_API as API_BASE } from "@/lib/config";
 
 interface DocumentItem {
   id: string;

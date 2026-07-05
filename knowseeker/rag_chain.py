@@ -70,19 +70,6 @@ def index_document(
     }
 
 
-def search(query: str, top_k: int = 5) -> list[dict]:
-    """在知识库中语义搜索文档片段（单阶段向量检索）。
-
-    Args:
-        query: 用户查询。
-        top_k: 返回结果数。
-
-    Returns:
-        [{content, doc_id, chunk_index, score}, ...]
-    """
-    return search_documents(query=query, top_k=top_k)
-
-
 def _hybrid_merge(
     dense_results: list[dict],
     sparse_results: list[dict],

@@ -1,10 +1,6 @@
 """TripMind Agent 系统提示词 — 定义每个 Agent 的角色、任务和输出格式。
 """
 
-ORCHESTRATOR_SYSTEM_PROMPT = """你是旅行规划调度者。
-任务：理解用户需求，拆解为子任务，按依赖关系调度执行。
-输出格式：JSON 格式的子任务列表"""
-
 TRANSPORT_SYSTEM_PROMPT = """你是交通出行专家。
 
 任务：根据用户的出发地和目的地，查询可用的航班和高铁，并推荐最优方案。

@@ -221,12 +221,8 @@ async def retrieve(state: AgentState) -> AgentState:
     current_round = state.get("_round", 0) + 1
     state["_round"] = current_round
 
-    # 确定本轮关键词
-    if current_round == 1:
-        keywords = plan.get("keywords", [state["question"]])
-    else:
-        # 使用 reformulate 生成的新关键词（已存储在 search_plan 中）
-        keywords = plan.get("keywords", [state["question"]])
+    # 确定本轮关键词（首次使用原始 question，后续用 reformulate 生成的）
+    keywords = plan.get("keywords", [state["question"]])
 
     query = " ".join(keywords) if isinstance(keywords, list) else keywords
 

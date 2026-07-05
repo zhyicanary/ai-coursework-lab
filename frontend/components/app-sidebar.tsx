@@ -8,7 +8,6 @@ import {
     Plane,
     Settings,
     Sparkles,
-    Github,
 } from "lucide-react";
 
 import {
