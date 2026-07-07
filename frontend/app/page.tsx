@@ -122,7 +122,7 @@ export default function HomePage() {
                     </div>
 
                     <h1 className="text-4xl font-bold tracking-tight md:text-5xl animate-fade-in-up">
-                        AI Coursework{" "}
+                        AgentForge{" "}
                         <span className="text-gradient">Lab</span>
                     </h1>
 
@@ -378,7 +378,7 @@ export default function HomePage() {
                         MCP Protocol
                     </p>
                     <p className="mt-1 text-xs text-muted-foreground">
-                        智能应用系统设计 — 课程设计作品集 © 2026
+                        AgentForge — AI Agent 应用工坊 © 2026
                     </p>
                 </div>
             </footer>

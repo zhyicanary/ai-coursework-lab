@@ -64,10 +64,10 @@ export function AppSidebar() {
                                 </div>
                                 <div className="flex flex-col gap-0.5 leading-none">
                                     <span className="font-semibold">
-                                        AI Coursework Lab
+                                        AgentForge
                                     </span>
                                     <span className="text-xs text-muted-foreground">
-                                        智能应用系统设计
+                                        AI Agent 应用工坊
                                     </span>
                                 </div>
                             </Link>

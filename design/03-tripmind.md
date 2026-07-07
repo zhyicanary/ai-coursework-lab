@@ -1,4 +1,4 @@
-# 课设二 & 竞赛：智能旅游助手
+# 项目二 & 竞赛：智能旅游助手
 
 ## 需求分析与软件设计文档
 
@@ -16,12 +16,12 @@
 
 | 用途 | 侧重点 | 提交物 |
 |------|--------|--------|
-| **课设二** | 展示多 Agent 协同 + LangGraph + MCP 技术 | 源码 + 文档 + 视频 |
+| **项目二** | 展示多 Agent 协同 + LangGraph + MCP 技术 | 源码 + 文档 + 视频 |
 | **竞赛** | 展示垂直场景落地 + 实用价值 | 源码 + 演示 |
 
-### 1.4 与课设一的差异化
+### 1.4 与项目一的差异化
 
-| 维度 | 课设一 KnowSeeker | 课设二 TripMind |
+| 维度 | 项目一 KnowSeeker | 项目二 TripMind |
 |------|-----------------|-----------------|
 | Agent 数量 | 1 个（多步推理） | 5 个（协同分工） |
 | 核心机制 | Agentic RAG 检索链 | Multi-Agent 任务编排 |
@@ -260,7 +260,7 @@ class TravelState(TypedDict):
 
 | 模块 | 文件 | 职责 |
 |------|------|------|
-| LLM 客户端 | `common/llm_client.py` | 与课设一复用 |
+| LLM 客户端 | `common/llm_client.py` | 与项目一复用 |
 | MCP Server | `common/mcp_server/` | 暴露旅游相关工具 |
 | 向量存储 | `common/vector_store.py` | 存储景点/攻略信息 |
 | 编排器 | `project2_travel/orchestrator.py` | LangGraph 状态机核心 |
@@ -580,7 +580,7 @@ def build_travel_graph() -> StateGraph:
 
 ## 八、数据来源策略
 
-考虑到课设不需要真实 API：
+考虑到项目不需要真实 API：
 
 | 数据 | 方案 | 
 |------|------|

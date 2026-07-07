@@ -1,6 +1,6 @@
 # 技术栈选型决策文档
 
-> 多个课设共用同一技术底座，降低学习成本，提高代码复用率。
+> 多个项目共用同一技术底座，降低学习成本，提高代码复用率。
 
 ---
 
@@ -9,7 +9,7 @@
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                      前端展示层                           │
-│          Streamlit（课设1）+ Gradio（课设2）               │
+│          Streamlit（项目一）+ Gradio（项目二）               │
 ├─────────────────────────────────────────────────────────┤
 │                      编排框架层                           │
 │              LangChain + LangGraph（共用）                │
@@ -39,7 +39,7 @@
 | 调用延迟 | 快 | 快 | 中 | 取决于硬件 |
 | 注册门槛 | 低 | 低 | 需翻墙 | 无 |
 
-**结论**：DeepSeek，性价比最高，中文好，API 与 OpenAI 完全兼容，代码迁移零成本。ollama方便本地调试。课设选择 ollama。
+**结论**：DeepSeek，性价比最高，中文好，API 与 OpenAI 完全兼容，代码迁移零成本。ollama方便本地调试。项目选择 ollama。
 
 ### 2.2 编排框架：LangChain + LangGraph
 
@@ -55,7 +55,7 @@
 | 安装复杂度 | `pip install` | `pip install` | `pip install` |
 | 持久化 | ✅ 内置 | ✅ | ❌ 需手动 |
 | API 风格 | Pythonic | 复杂 | C++ 风格 |
-| 课设适用性 | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐ |
+| 项目适用性 | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐ |
 
 **结论**：ChromaDB，零配置，Python 原生体验，持久化开箱即用。
 
@@ -73,8 +73,8 @@ pip install mcp
 
 | 项目 | 框架 | 理由 |
 | --- | --- | --- |
-| **课设1：知识助手** | **Streamlit** | 聊天界面天然适配，st.chat_message 开箱即用 |
-| **课设2：旅游助手** | **Gradio** | 支持复杂布局，Gr.Blocks 灵活排列 Agent 状态卡片 |
+| **项目一：知识助手** | **Streamlit** | 聊天界面天然适配，st.chat_message 开箱即用 |
+| **项目二：旅游助手** | **Gradio** | 支持复杂布局，Gr.Blocks 灵活排列 Agent 状态卡片 |
 
 > 选两个不同前端也体现了"根据场景选工具"的工程判断力，答辩时是加分项。
 
@@ -137,11 +137,11 @@ pip install python-dotenv tiktoken
 ## 四、项目目录结构
 
 ```
-ai-coursework-lab/
+agent-forge/
 ├── design/                      # 设计文档
 │   ├── 01-tech-stack.md         # 本文件
-│   ├── 02-project1-rag.md       # 课设1 设计（KnowSeeker）
-│   └── 03-project2-travel.md    # 课设2 & 竞赛 设计（TripMind）
+│   ├── 02-project1-rag.md       # 项目一 设计（KnowSeeker）
+│   └── 03-project2-travel.md    # 项目二 & 竞赛 设计（TripMind）
 │
 ├── common/                      # 公共模块（两项目共享）
 │   ├── __init__.py
@@ -154,12 +154,12 @@ ai-coursework-lab/
 │       ├── server.py            # MCP Server 主入口
 │       └── tools.py             # MCP 工具定义
 │
-├── project1_rag/                # 课设1：智能知识助手（KnowSeeker）
+├── project1_rag/                # 项目一：智能知识助手（KnowSeeker）
 │   ├── app.py                   # Streamlit 入口
 │   ├── agent.py                 # LangGraph Agent
 │   └── rag_chain.py             # RAG 链路
 │
-├── project2_travel/             # 课设2 & 竞赛：智能旅游助手（TripMind）
+├── project2_travel/             # 项目二 & 竞赛：智能旅游助手（TripMind）
 │   ├── app.py                   # Gradio 入口
 │   ├── orchestrator.py          # LangGraph 编排器
 │   └── agents/                  # 6 个子 Agent

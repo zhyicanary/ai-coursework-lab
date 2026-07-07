@@ -9,13 +9,13 @@
 ### 1.1 目录结构（最终状态）
 
 ```
-ai-coursework-lab/
-├── common/                              # 公共模块（与课设一复用）
+agent-forge/
+├── common/                              # 公共模块（与项目一复用）
 │   ├── __init__.py
 │   ├── llm_client.py                    # [Phase 1] DeepSeek API 封装
 │   ├── embedding.py                     # [Phase 1] bge-small-zh 向量化
 │   ├── vector_store.py                  # [Phase 1] ChromaDB 操作
-│   ├── document_loader.py               # [Phase 1] 文档解析（与课设一复用）
+│   ├── document_loader.py               # [Phase 1] 文档解析（与项目一复用）
 │   └── mcp_server/
 │       ├── __init__.py
 │       ├── server.py                    # [Phase 2] MCP Server 主入口
@@ -29,7 +29,7 @@ ai-coursework-lab/
 │               ├── chengdu.json
 │               ├── beijing.json
 │               └── ...
-├── tripmind/                            # 课设二
+├── tripmind/                            # 项目二
 │   ├── __init__.py
 │   ├── types.py                         # [Phase 3] 核心数据结构
 │   ├── orchestrator.py                  # [Phase 3] LangGraph 编排器

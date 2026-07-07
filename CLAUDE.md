@@ -1,4 +1,4 @@
-# KCSJ Collection — 智能应用系统设计 课设作品集
+# AgentForge — AI Agent 应用工坊
 
 同一技术底座，两种 Agent 范式：
 
@@ -29,7 +29,7 @@
 ## 项目结构
 
 ```
-ai-coursework-lab/
+agent-forge/
 ├── common/                          # 公共模块
 │   ├── context.py                   # App Context — 全局服务上下文（LLM/Embedding/Reranker/BM25/ChromaDB）
 │   ├── llm_client.py                # 推理层：LLM 客户端（DeepSeek/Ollama 热切换）
@@ -71,7 +71,7 @@ ai-coursework-lab/
 │   ├── lib/
 │   │   └── config.ts                # API 基础 URL 配置
 │   └── package.json
-├── tripmind/                        # 课设二：多 Agent 旅游规划
+├── tripmind/                        # 项目二：多 Agent 旅游规划
 │   ├── orchestrator.py              # LangGraph 状态机编排器
 │   ├── prompts.py                   # 6 个 Agent 系统提示词（含 JSON 输出格式）
 │   ├── types.py                     # TravelRequest / TravelState 类型定义
@@ -83,7 +83,7 @@ ai-coursework-lab/
 │       ├── itinerary.py             # ItineraryAgent：每日行程规划
 │       ├── budget.py                # BudgetAgent：费用汇总预算检查
 │       └── summarizer.py            # SummarizerAgent：Markdown 方案生成
-├── knowseeker/                      # 课设一：单 Agent RAG 问答
+├── knowseeker/                      # 项目一：单 Agent RAG 问答
 │   ├── agent.py                     # LangGraph Agentic RAG 状态机
 │   └── rag_chain.py                 # RAG 管道（混合检索 + RRF 融合 + 重排序）
 ├── design/                          # 设计文档

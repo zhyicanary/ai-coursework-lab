@@ -1,4 +1,4 @@
-# 智能应用系统设计 — 课程设计作品集 | [English](README_EN.md)
+# AgentForge — AI Agent 应用工坊 | [English](README_EN.md)
 
 [![Python](https://img.shields.io/badge/Python-3.14-blue)](https://www.python.org/)
 [![LangGraph](https://img.shields.io/badge/LangGraph-1.2-orange)](https://www.langchain.com/langgraph)
@@ -44,7 +44,7 @@
 
 ```bash
 git clone <this-repo>
-cd ai-coursework-lab
+cd agent-forge
 
 # 安装依赖
 uv sync
@@ -254,7 +254,7 @@ MCP Server (端口 8765, FastAPI 生命周期自动管理)
 ## 项目结构
 
 ```
-ai-coursework-lab/
+agent-forge/
 ├── common/                        # 公共模块（两个项目共享）
 │   ├── context.py                 # App Context — 全局服务上下文
 │   ├── llm_client.py              # 推理层：LLM 客户端（DeepSeek/Ollama 热切换）
@@ -346,7 +346,7 @@ ai-coursework-lab/
 
 ## 适合谁看
 
-- 正在做大模型/Agent 课设的同学
+- 正在学习大模型 Agent 开发的同学
 - 想了解 LangGraph + MCP 实战的开发者
 - 需要 Multi-Agent 架构参考的工程师
 - 想学习前后端分离 AI 应用架构的全栈开发者

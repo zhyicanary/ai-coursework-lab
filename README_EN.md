@@ -1,4 +1,4 @@
-# Intelligent Application System Design — Coursework Portfolio | [中文](README.md)
+# AgentForge — AI Agent Application Workshop | [中文](README.md)
 
 [![Python](https://img.shields.io/badge/Python-3.14-blue)](https://www.python.org/)
 [![LangGraph](https://img.shields.io/badge/LangGraph-1.2-orange)](https://www.langchain.com/langgraph)
@@ -44,7 +44,7 @@ This project supports two frontend options, sharing the same Python backend logi
 
 ```bash
 git clone <this-repo>
-cd ai-coursework-lab
+cd agent-forge
 
 # Install dependencies
 uv sync

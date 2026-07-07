@@ -144,7 +144,7 @@ class SettingsRequest(BaseModel):
 
 # ── FastAPI 应用 ──────────────────────────────────────────
 
-app = FastAPI(title="AI Coursework Lab API", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="AgentForge API", version="0.1.0", lifespan=lifespan)
 
 # CORS — 允许所有来源
 app.add_middleware(

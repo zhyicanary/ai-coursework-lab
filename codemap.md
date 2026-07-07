@@ -1,8 +1,8 @@
-# 仓库地图: ai-coursework-lab
+# 仓库地图: agent-forge
 
 ## 项目职责
 
-**智能应用系统设计课设作品集** — 基于统一技术底座（DeepSeek API + Ollama Embedding + ChromaDB + MCP 协议），实现两种不同的 Agent 范式：
+**AgentForge — AI Agent 应用工坊** — 基于统一技术底座（DeepSeek API + Ollama Embedding + ChromaDB + MCP 协议），实现两种不同的 Agent 范式：
 
 | # | 项目 | 范式 | 前端 | 入口 |
 |---|------|------|------|------|
