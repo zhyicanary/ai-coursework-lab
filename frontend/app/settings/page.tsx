@@ -83,7 +83,9 @@ export default function SettingsPage() {
                 setBackendOnline(true);
                 const data = await res.json();
                 setBackend(data.backend || "deepseek");
-                setModel(data.model || "");
+                const restoredModel = data.model || "";
+                setModel(restoredModel);
+                savedModelRef.current = restoredModel;
                 setApiKey(data.api_key || "");
                 setBaseUrl(data.base_url || "https://api.deepseek.com");
                 setEmbModel(data.embedding_model || "qwen3-embedding:8b");
@@ -118,6 +120,8 @@ export default function SettingsPage() {
 
     // 追踪当前 backend，用于忽略已过期的异步响应
     const backendRef = useRef(backend);
+    // 追踪 loadSettings 恢复的模型，避免被模型列表覆盖
+    const savedModelRef = useRef<string | null>(null);
     useEffect(() => {
         backendRef.current = backend;
     }, [backend]);
@@ -129,9 +133,6 @@ export default function SettingsPage() {
 
         const currentBackend = backend;
         setModelsLoading(true);
-        // 切换后端时清空模型，新列表加载后再选中第一个
-        setModel("");
-
         const fetchModels = async () => {
             try {
                 const res = await fetch(
@@ -143,16 +144,21 @@ export default function SettingsPage() {
                     if (currentBackend !== backendRef.current) return;
                     const list = Array.isArray(data.models) ? data.models : [];
                     setModels(list);
-                    if (list.length > 0) {
+                    // 保留已保存的模型（如果它在列表中），否则选第一个
+                    const saved = savedModelRef.current;
+                    if (saved && list.includes(saved)) {
+                        setModel(saved);
+                    } else if (list.length > 0) {
                         setModel(list[0]);
                     }
+                    savedModelRef.current = null;
                 }
             } catch {
                 if (currentBackend !== backendRef.current) return;
                 const fallback =
                     currentBackend === "ollama"
-                        ? ["gemma4:latest"]
-                        : ["deepseek-v4-flash", "deepseek-v4-pro"];
+                        ? ["gemma3:latest"]
+                        : ["deepseek-chat", "deepseek-reasoner"];
                 setModels(fallback);
                 if (fallback.length > 0) {
                     setModel(fallback[0]);

@@ -262,6 +262,20 @@ export default function TripMindPage() {
       toast.error("请输入目的地")
       return
     }
+    if (!departure.trim()) {
+      toast.error("请输入出发城市")
+      return
+    }
+    const numDays = Number(days) || 0
+    const numBudget = Number(budget) || 0
+    if (numDays < 1) {
+      toast.error("天数至少为 1")
+      return
+    }
+    if (numBudget < 100) {
+      toast.error("预算至少为 100 元")
+      return
+    }
 
     setError(null)
     setPlanResult(null)
@@ -283,8 +297,8 @@ export default function TripMindPage() {
         body: JSON.stringify({
           destination,
           departure_city: departure,
-          days: Number(days) || 0,
-          budget: Number(budget) || 0,
+          days: numDays,
+          budget: numBudget,
           preferences,
         }),
       })

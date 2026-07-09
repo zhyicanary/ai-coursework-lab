@@ -13,7 +13,7 @@ class HotelAgent(BaseAgent):
 
     async def execute(self, state: dict) -> dict:
         request = state["request"]
-        max_price_per_night = (request["budget"] * 0.4) / request["days"]
+        max_price_per_night = (request["budget"] * 0.4) / max(1, request["days"])
 
         # 1. 调用 MCP 工具获取酒店数据
         hotels = await self.call_mcp("search_hotels", {

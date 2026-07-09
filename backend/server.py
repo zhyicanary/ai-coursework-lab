@@ -21,7 +21,7 @@ import httpx
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import Field, BaseModel
 
 # ── 导入现有模块 ──────────────────────────────────────────
 
@@ -117,8 +117,8 @@ class ChatRequest(BaseModel):
 
 class TravelPlanRequest(BaseModel):
     destination: str
-    days: int
-    budget: float
+    days: int = Field(ge=1, le=30)
+    budget: float = Field(ge=100)
     preferences: list[str] = []
     departure_city: str
 
