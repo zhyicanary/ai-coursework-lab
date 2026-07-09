@@ -256,7 +256,11 @@ async def run_travel_planner_stream(request: TravelRequest, progress=None):
     """
     graph = build_travel_graph()
     initial = _build_initial_state(request)
-    accumulated: dict = {"request": request}
+    # 保留完整 state 字段，供追问调整 (adjust_plan) 使用
+    _state_keys = {
+        "request", "adjustment_history", "budget_adjusted",
+        "agent_logs", "current_step",
+    }
 
     async for chunk in graph.astream(initial, stream_mode="updates"):
         for _node_name, updates in chunk.items():
@@ -264,6 +268,8 @@ async def run_travel_planner_stream(request: TravelRequest, progress=None):
                 if key.endswith("_result") or key == "final_plan":
                     accumulated[key] = value
                     yield {key: value}
+                elif key in _state_keys:
+                    accumulated[key] = value
 
     yield {"__full_state__": accumulated}
 

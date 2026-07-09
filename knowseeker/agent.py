@@ -100,12 +100,12 @@ SYSTEM_PROMPT = """你是一个智能知识检索助手。你的任务是分析�
 
 请分析用户问题并输出 JSON（不要包含 markdown 代码块标记）：
 
-{{
+{
   "keywords": ["关键词1", "关键词2", ...],
   "strategy": "single" | "multi",
   "num_rounds": 1 | 2 | 3,
   "reasoning": "简短的分析说明"
-}}
+}
 
 规则：
 - 简单事实性问题 → strategy="single", num_rounds=1

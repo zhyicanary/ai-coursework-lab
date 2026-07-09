@@ -229,7 +229,7 @@ async def upload_document(file: UploadFile = File(...)):
             tmp.write(content)
             tmp_path = tmp.name
 
-        result = index_document(tmp_path, file.filename)
+        result = await asyncio.to_thread(index_document, tmp_path, file.filename)
         return result
 
     except Exception as e:
@@ -244,7 +244,7 @@ async def upload_document(file: UploadFile = File(...)):
 async def get_documents():
     """列出知识库中所有已索引文档。"""
     try:
-        return list_documents()
+        return await asyncio.to_thread(list_documents)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -253,7 +253,7 @@ async def get_documents():
 async def remove_document(doc_id: str):
     """从知识库删除指定文档。"""
     try:
-        deleted = delete_document(doc_id)
+        deleted = await asyncio.to_thread(delete_document, doc_id)
         return {"deleted": deleted}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
