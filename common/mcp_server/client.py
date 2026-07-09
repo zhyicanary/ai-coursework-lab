@@ -103,6 +103,8 @@ async def call_tool(name: str, arguments: dict | None = None) -> Any:
         return result
     except Exception as e:
         if ctx.mcp_available is None:
+            # 初始探测阶段失败也要计数，否则熔断器永远不触发
+            ctx.mark_mcp_failure()
             print(
                 f"[MCP] {name} 通过 HTTP 失败 ({e.__class__.__name__})，"
                 f"已回退到直接调用（将重试 HTTP）"

@@ -80,12 +80,16 @@ class LLMClient:
         base_url: str | None = None,
     ):
         """更新配置并重建 client，同时持久化到 .env 文件。"""
-        if backend is not None:
+        if backend is not None and backend != self.backend:
+            # 切换后端时清空旧配置，避免残留导致请求发到错误地址
             self.backend = backend
+            self.model = ""
+            self.api_key = ""
+            self.base_url = ""
             set_key(str(ENV_FILE), "LLM_BACKEND", backend)
         if model is not None:
             self.model = model
-            if backend == "ollama" or self.backend == "ollama":
+            if self.backend == "ollama":
                 set_key(str(ENV_FILE), "OLLAMA_MODEL", model)
             else:
                 set_key(str(ENV_FILE), "DEEPSEEK_MODEL", model)
@@ -95,7 +99,7 @@ class LLMClient:
                 set_key(str(ENV_FILE), "DEEPSEEK_API_KEY", api_key)
         if base_url is not None:
             self.base_url = base_url
-            if backend == "ollama" or self.backend == "ollama":
+            if self.backend == "ollama":
                 set_key(str(ENV_FILE), "OLLAMA_BASE_URL", base_url)
             else:
                 set_key(str(ENV_FILE), "DEEPSEEK_BASE_URL", base_url)
