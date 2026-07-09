@@ -116,7 +116,16 @@ class BaseAgent(ABC):
             return state
         except Exception as e:
             self.add_log(state, f"执行失败：{e}", "error")
-            # 设置失败结果，标注暂无数据
+            # Summarizer 失败时写入 final_plan，否则前端收不到任何方案
+            if self.name == "汇总":
+                if not state.get("final_plan"):
+                    state["final_plan"] = (
+                        f"# 规划方案生成失败\n\n"
+                        f"汇总 Agent 执行出错：{e}\n\n"
+                        f"其他 Agent 的结果可能正常，请查看上方状态面板。"
+                    )
+                return state
+            # 其他 Agent 失败时设置失败结果，标注暂无数据
             result_key = f"{self._result_key()}_result"
             if result_key not in state:
                 state[result_key] = {"error": str(e), "source": f"{self.name} Agent"}

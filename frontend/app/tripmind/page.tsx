@@ -265,6 +265,7 @@ export default function TripMindPage() {
 
     setError(null)
     setPlanResult(null)
+    planResultRef.current = null
     setAdjustInput("")
     setAdjustResult(null)
     setPlanning(true)
@@ -374,8 +375,8 @@ export default function TripMindPage() {
         setAdjustResult(data.final_plan)
         toast.success("行程已根据您的需求调整")
       }
-      if (data.__full_state__) setLastState(data.__full_state__)
-      else if (data.state) setLastState(data.state)
+      // Backend returns the full state dict directly
+      setLastState(data)
 
       setAdjustInput("")
     } catch (err) {
